@@ -12,6 +12,11 @@
 
 ---
 
+> [!WARNING]
+> **🚧 Beta Software** — This project is under active development. Workflows and commands may be incomplete or broken. Your feedback helps make this better!
+>
+> 💬 **Have feedback or found a bug?** Reach out at [**@_Shikh4r_** on X](https://x.com/_Shikh4r_)
+
 ## Quick Start
 
 ```bash
