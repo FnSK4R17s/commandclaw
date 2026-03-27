@@ -50,6 +50,10 @@ CommandClaw is a Git-native AI agent platform — a ground-up Python redesign of
 │   │       ├── file_write.py       # Write files (path-validated)
 │   │       ├── vault_memory.py     # memory_read / memory_write tools
 │   │       └── vault_skill.py      # read_skill tool
+│   ├── mcp/
+│   │   ├── __init__.py
+│   │   ├── client.py               # Connect to MCP servers, discover tools
+│   │   └── tools.py                # Wrap MCP tools as LangChain tools
 │   ├── telegram/
 │   │   ├── __init__.py
 │   │   ├── bot.py                  # Bot setup + polling loop
@@ -83,7 +87,8 @@ commandclaw-vault/                   # Clone to create a new agent
 │   └── DailyNote.md
 ├── _fileClasses/                    # Metadata Menu fileClasses
 ├── .commandclaw/
-│   └── workspace-state.json         # Onboarding/bootstrap state
+│   ├── workspace-state.json         # Onboarding/bootstrap state
+│   └── mcp.json                     # MCP server endpoints (optional)
 ├── .obsidian/                       # Pre-configured for Obsidian app
 │   ├── app.json                     # Markdown links, source mode, frontmatter visible
 │   ├── appearance.json              # Dark theme
@@ -107,6 +112,7 @@ commandclaw-vault/                   # Clone to create a new agent
 - `pydantic` + `pydantic-settings` — config validation
 - `python-frontmatter` — parse YAML frontmatter from markdown
 - `python-dotenv` — load .env files
+- `mcp` — MCP client SDK (Model Context Protocol)
 
 ## Build Phases
 
@@ -126,17 +132,21 @@ commandclaw-vault/                   # Clone to create a new agent
 11. `agent/runtime.py` — LangChain AgentExecutor loop
 12. `agent/retry.py` — retry wrapper
 
-### Phase 3 — Telegram
-13. `telegram/sender.py` — outbound messages + chunking
-14. `telegram/handlers.py` — message routing + error handling
-15. `telegram/bot.py` — bot setup + polling
-16. `__main__.py` — entry point
+### Phase 3 — MCP Client
+13. `mcp/client.py` — connect to MCP servers listed in vault `mcp.json`, discover available tools
+14. `mcp/tools.py` — wrap MCP tools as LangChain tools, wire into AgentExecutor alongside native tools
 
-### Phase 4 — Observability & Deployment
-17. `tracing/langfuse_tracing.py` — wire into runtime
-18. `Dockerfile` + `docker-compose.yml`
-19. `.env.example`
-20. `scripts/migrate-from-openclaw.sh` — OpenClaw workspace migration ✅
+### Phase 4 — Telegram
+15. `telegram/sender.py` — outbound messages + chunking
+16. `telegram/handlers.py` — message routing + error handling
+17. `telegram/bot.py` — bot setup + polling
+18. `__main__.py` — entry point
+
+### Phase 5 — Observability & Deployment
+19. `tracing/langfuse_tracing.py` — wire into runtime
+20. `Dockerfile` + `docker-compose.yml`
+21. `.env.example`
+22. `scripts/migrate-from-openclaw.sh` — OpenClaw workspace migration ✅
 
 ### Done ✅
 - Vault template repo (`commandclaw-vault`) — all workspace files, Obsidian plugins pre-configured
@@ -170,6 +180,7 @@ The vault structure mirrors OpenClaw's workspace layout — same file names, sam
 - **Asyncio lock per chat_id** — prevents concurrent execution for same user
 - **Skills fetched, not shipped** — `npx skills add FnSK4R17s/commandclaw-skills`, not hardcoded
 - **Obsidian-native vaults** — pre-configured plugins for git sync, templates, frontmatter, linting
+- **MCP client in Week One** — agents connect to external MCP servers from day one. MCP tools appear alongside native tools in the AgentExecutor. Config lives in `.commandclaw/mcp.json` inside the vault. MCP server mode (exposing CommandClaw as an MCP server) and per-agent access control are Week Two.
 
 ## Verification
 
@@ -177,3 +188,4 @@ The vault structure mirrors OpenClaw's workspace layout — same file names, sam
 2. Integration test: send a Telegram message, agent reads vault, uses tools, responds
 3. Langfuse dashboard: verify traces show LLM calls, tool calls, and timing
 4. Recovery test: corrupt vault state, verify agent recovers and alerts user
+5. MCP test: configure an MCP server, verify agent discovers and calls MCP tools

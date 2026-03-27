@@ -73,13 +73,15 @@ The agent's vault — not chat — should be the control plane. Configuration, m
 - Vault reading and writing (agents.md, memory files).
 - Skill discovery and loading from folder structure.
 - Langfuse integration for execution tracing.
+- MCP client integration — agents connect to external MCP servers and use their tools alongside native ones.
 - One working agent — the coding agent, as it exercises the most complex execution path.
 
 ### Week Two
 
 - Proper job scheduler for reliable reminders and recurring tasks.
 - Git-based resumability for failed executions.
-- MCP server scaffolding and integration.
+- MCP server mode — expose CommandClaw agent capabilities as MCP tools for other clients.
+- MCP access control — per-agent tool visibility enforcement at the server level.
 - Multi-tenant vault isolation patterns.
 
 ### Non-Scope
