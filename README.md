@@ -12,6 +12,29 @@
 
 ---
 
+## Quick Start
+
+```bash
+# 1. Clone the vault template to create a new agent
+gh repo clone FnSK4R17s/commandclaw-vault my-agent
+
+# 2. Install skills
+cd my-agent
+npx skills add bash
+npx skills add github
+npx skills add file-ops
+
+# 3. Open in Obsidian (plugins are pre-configured)
+```
+
+## Repositories
+
+| Repo | Purpose |
+|------|---------|
+| [commandclaw](https://github.com/FnSK4R17s/commandclaw) | Main project — agent runtime, Telegram I/O, tracing |
+| [commandclaw-skills](https://github.com/FnSK4R17s/commandclaw-skills) | Skills library — fetched via `npx skills add` |
+| [commandclaw-vault](https://github.com/FnSK4R17s/commandclaw-vault) | Vault template — clone to create a new agent |
+
 ## Why Python?
 
 CommandClaw is I/O-bound, not CPU-bound. The agent spends 99%+ of its time waiting on external calls — LLM API responses (1-10s), subprocess execution, file I/O, Git operations, and Telegram API calls. Python's runtime speed is irrelevant here.

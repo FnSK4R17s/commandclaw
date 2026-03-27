@@ -51,7 +51,7 @@ CommandClaw is a Git-native AI agent platform — a ground-up Python redesign of
 │   ├── test_vault_*.py
 │   ├── test_agent_runtime.py
 │   └── test_retry.py
-└── example_vault/                   # Coding agent vault (mirrors OpenClaw workspace)
+└── example_vault/                   # Local copy — canonical source is FnSK4R17s/commandclaw-vault
     ├── AGENTS.md                    # Repo guidelines, coding style, build commands
     ├── SOUL.md                      # Agent personality, values, communication style
     ├── IDENTITY.md                  # Name, creature type, vibe, emoji, avatar
@@ -115,7 +115,7 @@ CommandClaw is a Git-native AI agent platform — a ground-up Python redesign of
 
 ### Phase 4 — Observability & Deployment
 16. `tracing/langfuse_tracing.py` — wire into runtime
-17. `example_vault/` — coding agent vault content + `.obsidian/` pre-configured
+17. `example_vault/` — vault template (canonical source: [commandclaw-vault](https://github.com/FnSK4R17s/commandclaw-vault)) ✅
 18. `Dockerfile` + `docker-compose.yml`
 19. `.env.example`
 20. `scripts/migrate-from-openclaw.sh` — OpenClaw workspace migration
