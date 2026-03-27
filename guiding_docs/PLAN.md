@@ -136,12 +136,13 @@ commandclaw-vault/                   # Clone to create a new agent
 17. `tracing/langfuse_tracing.py` — wire into runtime
 18. `Dockerfile` + `docker-compose.yml`
 19. `.env.example`
-20. `scripts/migrate-from-openclaw.sh` — OpenClaw workspace migration
+20. `scripts/migrate-from-openclaw.sh` — OpenClaw workspace migration ✅
 
 ### Done ✅
 - Vault template repo (`commandclaw-vault`) — all workspace files, Obsidian plugins pre-configured
 - Skills repo (`commandclaw-skills`) — bash, github, file-ops skills
 - Guiding docs — VISION.md, PLAN.md, README.md
+- Migration script — tested against live OpenClaw workspace, preserves `skills-lock.json` (see [#1](https://github.com/FnSK4R17s/commandclaw/issues/1))
 
 ## OpenClaw Compatibility
 
