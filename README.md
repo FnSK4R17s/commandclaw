@@ -70,7 +70,15 @@ Skills are managed by administrators, not agents. Agents can read and use skills
 
 ## MCP
 
-Agents connect to external [MCP](https://modelcontextprotocol.io/) servers and use their tools alongside native ones (bash, file read/write, etc.). MCP tools are discovered automatically and appear in the agent's tool list.
+OpenClaw agents interact with external tools via ad-hoc API calls — no authentication boundaries, no access control, no predictability. Any agent can call any API with whatever credentials are lying around. This is the single biggest security gap in the architecture.
+
+CommandClaw uses [MCP](https://modelcontextprotocol.io/) to fix this:
+
+- **RBAC at the protocol level** — MCP servers control which tools an agent can see. Unauthorized tools are invisible, not just forbidden. Access control is enforced by the server, not by prompting the agent to behave.
+- **Deterministic tool calling** — MCP defines a structured request/response contract for every tool. No more hoping the agent formats an API call correctly. The protocol guarantees schema validation, typed inputs, and predictable outputs.
+- **Credentials never touch the agent** — API keys live in the MCP server config, not in the agent's context. The agent calls a tool; the server handles authentication. The agent never sees or leaks the key.
+
+MCP tools are discovered automatically and appear in the agent's tool list alongside native ones (bash, file read/write, etc.).
 
 **Configuration lives outside the vault** — API keys and tokens never touch Git:
 
