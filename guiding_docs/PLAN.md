@@ -2,13 +2,14 @@
 
 ## Context
 
-CommandClaw is a Git-native AI agent platform — a ground-up Python redesign of OpenClaw focused on enterprise reliability and control. The vault (Git repo), not chat, is the control plane. Week One delivers: agent execution loop, Telegram I/O, vault system, skill discovery, Langfuse tracing, and one working coding agent.
+CommandClaw is a Git-native AI agent platform — a ground-up Python redesign of OpenClaw focused on enterprise reliability and control. The vault (Git repo), not chat, is the control plane. Week One delivers: agent execution loop, Telegram I/O, vault system, skill discovery, MCP gateway, Langfuse tracing, and one working coding agent.
 
 ## Repositories
 
 | Repo | Purpose | Status |
 |------|---------|--------|
-| [commandclaw](https://github.com/FnSK4R17s/commandclaw) | Main project — agent runtime, Telegram I/O, tracing | Guiding docs done, code pending |
+| [commandclaw](https://github.com/FnSK4R17s/commandclaw) | Agent runtime, Telegram I/O, tracing | Guiding docs done, code pending |
+| [commandclaw-mcp](https://github.com/FnSK4R17s/commandclaw-mcp) | MCP gateway — credential proxy with rotating keys | ✅ README done, code pending |
 | [commandclaw-skills](https://github.com/FnSK4R17s/commandclaw-skills) | Skills library — `npx skills add FnSK4R17s/commandclaw-skills` | ✅ Done (bash, github, file-ops) |
 | [commandclaw-vault](https://github.com/FnSK4R17s/commandclaw-vault) | Vault template — clone to create a new agent | ✅ Done (Obsidian pre-configured) |
 
@@ -52,7 +53,7 @@ CommandClaw is a Git-native AI agent platform — a ground-up Python redesign of
 │   │       └── vault_skill.py      # read_skill tool
 │   ├── mcp/
 │   │   ├── __init__.py
-│   │   ├── client.py               # Connect to MCP servers, discover tools
+│   │   ├── client.py               # Connect to commandclaw-mcp gateway via rotating key
 │   │   └── tools.py                # Wrap MCP tools as LangChain tools
 │   ├── telegram/
 │   │   ├── __init__.py
@@ -131,25 +132,32 @@ commandclaw-vault/                   # Clone to create a new agent
 11. `agent/runtime.py` — LangChain AgentExecutor loop
 12. `agent/retry.py` — retry wrapper
 
-### Phase 3 — MCP Client
-13. `mcp/client.py` — connect to MCP servers listed in vault `mcp.json`, discover available tools
-14. `mcp/tools.py` — wrap MCP tools as LangChain tools, wire into AgentExecutor alongside native tools
+### Phase 3 — MCP Gateway (commandclaw-mcp repo)
+13. Gateway server — accepts agent connections via rotating hourly keys, proxies to real MCP servers
+14. Key rotation — generate/expire agent keys on a configurable interval (default 1h)
+15. RBAC — per-agent access control (which agent sees which MCP tools)
+16. Audit logging — log every tool call (agent, tool, timestamp, inputs)
+
+### Phase 3b — MCP Client (commandclaw repo)
+17. `mcp/client.py` — connect to commandclaw-mcp gateway using rotating key, discover available tools
+18. `mcp/tools.py` — wrap MCP tools as LangChain tools, wire into AgentExecutor alongside native tools
 
 ### Phase 4 — Telegram
-15. `telegram/sender.py` — outbound messages + chunking
-16. `telegram/handlers.py` — message routing + error handling
-17. `telegram/bot.py` — bot setup + polling
-18. `__main__.py` — entry point
+19. `telegram/sender.py` — outbound messages + chunking
+20. `telegram/handlers.py` — message routing + error handling
+21. `telegram/bot.py` — bot setup + polling
+22. `__main__.py` — entry point
 
 ### Phase 5 — Observability & Deployment
-19. `tracing/langfuse_tracing.py` — wire into runtime
-20. `Dockerfile` + `docker-compose.yml`
-21. `.env.example`
-22. `scripts/migrate-from-openclaw.sh` — OpenClaw workspace migration ✅
+23. `tracing/langfuse_tracing.py` — wire into runtime
+24. `Dockerfile` + `docker-compose.yml`
+25. `.env.example`
+26. `scripts/migrate-from-openclaw.sh` — OpenClaw workspace migration ✅
 
 ### Done ✅
 - Vault template repo (`commandclaw-vault`) — all workspace files, Obsidian plugins pre-configured
 - Skills repo (`commandclaw-skills`) — bash, github, file-ops skills
+- MCP gateway repo (`commandclaw-mcp`) — README with security model and config spec
 - Guiding docs — VISION.md, PLAN.md, README.md
 - Migration script — tested against live OpenClaw workspace, preserves `skills-lock.json` (see [#1](https://github.com/FnSK4R17s/commandclaw/issues/1))
 
@@ -179,7 +187,7 @@ The vault structure mirrors OpenClaw's workspace layout — same file names, sam
 - **Asyncio lock per chat_id** — prevents concurrent execution for same user
 - **Skills fetched, not shipped** — `npx skills add FnSK4R17s/commandclaw-skills`, not hardcoded
 - **Obsidian-native vaults** — pre-configured plugins for git sync, templates, frontmatter, linting
-- **MCP client in Week One** — agents connect to external MCP servers from day one. MCP tools appear alongside native tools in the AgentExecutor. Config lives at `~/.commandclaw/mcp.json` (system-level, outside the vault) to keep API keys and tokens out of Git. Override with `COMMANDCLAW_MCP_CONFIG` env var. MCP server mode and per-agent access control are Week Two.
+- **MCP gateway as a separate service** — agents never see real credentials. The `commandclaw-mcp` gateway holds all API keys and proxies tool calls. Agents authenticate with rotating hourly keys — even if leaked, they expire within 60 minutes. RBAC is enforced at the gateway (unauthorized tools are invisible). Config lives at `~/.commandclaw/mcp.json` (outside the vault, out of Git).
 
 ## Verification
 

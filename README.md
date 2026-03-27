@@ -29,7 +29,8 @@ npx skills add FnSK4R17s/commandclaw-skills
 
 | Repo | Purpose |
 |------|---------|
-| [commandclaw](https://github.com/FnSK4R17s/commandclaw) | Main project — agent runtime, Telegram I/O, tracing |
+| [commandclaw](https://github.com/FnSK4R17s/commandclaw) | Agent runtime, Telegram I/O, tracing |
+| [commandclaw-mcp](https://github.com/FnSK4R17s/commandclaw-mcp) | MCP gateway — credential proxy with rotating keys |
 | [commandclaw-skills](https://github.com/FnSK4R17s/commandclaw-skills) | Skills library — `npx skills add FnSK4R17s/commandclaw-skills` |
 | [commandclaw-vault](https://github.com/FnSK4R17s/commandclaw-vault) | Vault template — clone to create a new agent |
 
@@ -76,20 +77,26 @@ CommandClaw uses [MCP](https://modelcontextprotocol.io/) to fix this:
 
 - **RBAC at the protocol level** — MCP servers control which tools an agent can see. Unauthorized tools are invisible, not just forbidden. Access control is enforced by the server, not by prompting the agent to behave.
 - **Deterministic tool calling** — MCP defines a structured request/response contract for every tool. No more hoping the agent formats an API call correctly. The protocol guarantees schema validation, typed inputs, and predictable outputs.
-- **Credentials never touch the agent** — API keys live in the MCP server config, not in the agent's context. The agent calls a tool; the server handles authentication. The agent never sees or leaks the key.
+- **Credentials never touch the agent** — API keys live in the MCP gateway, not in the agent's context. The agent calls a tool; the gateway authenticates with the real service. The agent never sees or leaks the key.
+- **Rotating keys limit blast radius** — agents authenticate to the gateway with a short-lived key that rotates every hour. Even if leaked via prompt injection or context dump, the key is dead within 60 minutes.
 
-MCP tools are discovered automatically and appear in the agent's tool list alongside native ones (bash, file read/write, etc.).
-
-**Configuration lives outside the vault** — API keys and tokens never touch Git:
+### Architecture
 
 ```
-~/.commandclaw/mcp.json
+Agent → (rotating hourly key) → commandclaw-mcp gateway → (real credentials) → External MCP Servers
 ```
 
-Override the path with `COMMANDCLAW_MCP_CONFIG` env var.
+The [commandclaw-mcp](https://github.com/FnSK4R17s/commandclaw-mcp) gateway is a separate service that holds all real credentials and proxies tool calls. Agents only need the gateway URL and their current rotating key.
+
+**Gateway config** (`~/.commandclaw/mcp.json`) — lives outside the vault, never in Git:
 
 ```json
 {
+  "gateway": {
+    "host": "0.0.0.0",
+    "port": 8420,
+    "key_rotation_interval_seconds": 3600
+  },
   "servers": {
     "notion": {
       "command": "npx",
@@ -101,6 +108,10 @@ Override the path with `COMMANDCLAW_MCP_CONFIG` env var.
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": { "GITHUB_TOKEN": "ghp_..." }
     }
+  },
+  "access": {
+    "coding-agent": ["github", "notion"],
+    "research-agent": ["notion"]
   }
 }
 ```
