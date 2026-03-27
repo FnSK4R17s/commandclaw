@@ -1,5 +1,5 @@
 <p align="center">
-  <span style="font-size: 100px;">⚓🦞</span>
+  <img src="logo.png" alt="Command Claw" width="180">
 </p>
 
 <h1 align="center">Command Claw</h1>
