@@ -68,6 +68,35 @@ npx skills add FnSK4R17s/commandclaw-skills
 
 Skills are managed by administrators, not agents. Agents can read and use skills but cannot install, update, or remove them. No skills ship with the vault by default — install what your agent needs.
 
+## MCP
+
+Agents connect to external [MCP](https://modelcontextprotocol.io/) servers and use their tools alongside native ones (bash, file read/write, etc.). MCP tools are discovered automatically and appear in the agent's tool list.
+
+**Configuration lives outside the vault** — API keys and tokens never touch Git:
+
+```
+~/.commandclaw/mcp.json
+```
+
+Override the path with `COMMANDCLAW_MCP_CONFIG` env var.
+
+```json
+{
+  "servers": {
+    "notion": {
+      "command": "npx",
+      "args": ["-y", "@notionhq/notion-mcp-server"],
+      "env": { "NOTION_API_KEY": "ntn_..." }
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_TOKEN": "ghp_..." }
+    }
+  }
+}
+```
+
 ## Migrating from OpenClaw
 
 CommandClaw's vault structure is compatible with OpenClaw workspaces. Run the migration script to convert:
