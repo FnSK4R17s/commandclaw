@@ -268,13 +268,10 @@ fi
 
 # --- Step 5: Remove OpenClaw-specific artifacts ---
 
-# Clean up files that don't belong in CommandClaw
-for file in skills-lock.json; do
-    if [[ -f "$DEST/$file" ]]; then
-        info "Removing OpenClaw artifact: $file"
-        rm "$DEST/$file"
-    fi
-done
+# Preserve skills-lock.json — used by Vercel's skills CLI for integrity tracking
+if [[ -f "$DEST/skills-lock.json" ]]; then
+    info "Preserving skills-lock.json (Vercel skills CLI lockfile)"
+fi
 
 # Remove .tools/ (OpenClaw-specific)
 if [[ -d "$DEST/.tools" ]]; then
