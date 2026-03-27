@@ -1,0 +1,28 @@
+{
+  "ruleConfigs": {
+    "yaml-key-sort": {
+      "enabled": true,
+      "yamlKeyPrioritySortOrder": "name\ndescription\ntype\ndate\ntags\ncreated\nupdated",
+      "priorityKeysAtStartOfYaml": true,
+      "yamlSortOrderForOtherKeys": "Ascending Alphabetical"
+    },
+    "yaml-timestamp": {
+      "enabled": true,
+      "dateCreated": true,
+      "dateCreatedKey": "created",
+      "dateModified": true,
+      "dateModifiedKey": "updated",
+      "format": "YYYY-MM-DD"
+    },
+    "format-tags-in-yaml": {
+      "enabled": true
+    }
+  },
+  "lintOnSave": true,
+  "displayChanged": true,
+  "foldersToIgnore": [
+    ".obsidian",
+    ".commandclaw",
+    ".agents"
+  ]
+}
