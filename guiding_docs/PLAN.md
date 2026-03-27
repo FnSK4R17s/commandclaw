@@ -87,8 +87,7 @@ commandclaw-vault/                   # Clone to create a new agent
 │   └── DailyNote.md
 ├── _fileClasses/                    # Metadata Menu fileClasses
 ├── .commandclaw/
-│   ├── workspace-state.json         # Onboarding/bootstrap state
-│   └── mcp.json                     # MCP server endpoints (optional)
+│   └── workspace-state.json         # Onboarding/bootstrap state
 ├── .obsidian/                       # Pre-configured for Obsidian app
 │   ├── app.json                     # Markdown links, source mode, frontmatter visible
 │   ├── appearance.json              # Dark theme
@@ -180,7 +179,7 @@ The vault structure mirrors OpenClaw's workspace layout — same file names, sam
 - **Asyncio lock per chat_id** — prevents concurrent execution for same user
 - **Skills fetched, not shipped** — `npx skills add FnSK4R17s/commandclaw-skills`, not hardcoded
 - **Obsidian-native vaults** — pre-configured plugins for git sync, templates, frontmatter, linting
-- **MCP client in Week One** — agents connect to external MCP servers from day one. MCP tools appear alongside native tools in the AgentExecutor. Config lives in `.commandclaw/mcp.json` inside the vault. MCP server mode (exposing CommandClaw as an MCP server) and per-agent access control are Week Two.
+- **MCP client in Week One** — agents connect to external MCP servers from day one. MCP tools appear alongside native tools in the AgentExecutor. Config lives at `~/.commandclaw/mcp.json` (system-level, outside the vault) to keep API keys and tokens out of Git. Override with `COMMANDCLAW_MCP_CONFIG` env var. MCP server mode and per-agent access control are Week Two.
 
 ## Verification
 
