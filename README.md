@@ -18,11 +18,9 @@
 # 1. Clone the vault template to create a new agent
 gh repo clone FnSK4R17s/commandclaw-vault my-agent
 
-# 2. Install skills
+# 2. Install skills (select which ones to add)
 cd my-agent
-npx skills add bash
-npx skills add github
-npx skills add file-ops
+npx skills add FnSK4R17s/commandclaw-skills
 
 # 3. Open in Obsidian (plugins are pre-configured)
 ```
@@ -32,7 +30,7 @@ npx skills add file-ops
 | Repo | Purpose |
 |------|---------|
 | [commandclaw](https://github.com/FnSK4R17s/commandclaw) | Main project — agent runtime, Telegram I/O, tracing |
-| [commandclaw-skills](https://github.com/FnSK4R17s/commandclaw-skills) | Skills library — fetched via `npx skills add` |
+| [commandclaw-skills](https://github.com/FnSK4R17s/commandclaw-skills) | Skills library — `npx skills add FnSK4R17s/commandclaw-skills` |
 | [commandclaw-vault](https://github.com/FnSK4R17s/commandclaw-vault) | Vault template — clone to create a new agent |
 
 ## Why Python?
@@ -64,13 +62,8 @@ Skills are markdown files in `.agents/skills/` within each agent's vault. They d
 **Install skills from the [commandclaw-skills](https://github.com/FnSK4R17s/commandclaw-skills) repo:**
 
 ```bash
-# Install a skill into the current vault
-npx skills add <skill-name>
-
-# Example: install the bash, github, and file-ops skills
-npx skills add bash
-npx skills add github
-npx skills add file-ops
+# Install skills into the current vault (select which ones to add)
+npx skills add FnSK4R17s/commandclaw-skills
 ```
 
 Skills are managed by administrators, not agents. Agents can read and use skills but cannot install, update, or remove them. No skills ship with the vault by default — install what your agent needs.

@@ -75,7 +75,7 @@ CommandClaw is a Git-native AI agent platform — a ground-up Python redesign of
     │       ├── metadata-menu/       # Structured frontmatter with fileClasses
     │       └── obsidian-linter/     # YAML key sorting, created/updated timestamps
     └── .agents/
-        └── skills/                  # Installed via `npx skills add` from commandclaw-skills repo
+        └── skills/                  # Installed via `npx skills add FnSK4R17s/commandclaw-skills`
             └── (empty — skills fetched on vault init, not shipped)
 ```
 
@@ -143,7 +143,7 @@ The vault structure mirrors OpenClaw's workspace layout — same file names, sam
 
 - **Easy migration** — run `scripts/migrate-from-openclaw.sh` to convert an OpenClaw workspace into a CommandClaw vault
 - **Familiar to OpenClaw users** — AGENTS.md, SOUL.md, IDENTITY.md, etc. are all in the same places
-- **Skills portability** — `.agents/skills/*/SKILL.md` follows the same discovery pattern, installed via `npx skills add` from [commandclaw-skills](https://github.com/FnSK4R17s/commandclaw-skills)
+- **Skills portability** — `.agents/skills/*/SKILL.md` follows the same discovery pattern, installed via `npx skills add FnSK4R17s/commandclaw-skills` from [commandclaw-skills](https://github.com/FnSK4R17s/commandclaw-skills)
 - **Memory portability** — `MEMORY.md` + `memory/YYYY-MM-DD.md` daily logs carry over
 
 **Migration script** (`scripts/migrate-from-openclaw.sh`) handles:
