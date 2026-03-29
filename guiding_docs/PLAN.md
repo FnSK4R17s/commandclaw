@@ -8,10 +8,11 @@ CommandClaw is a Git-native AI agent platform — a ground-up Python redesign of
 
 | Repo | Purpose | Status |
 |------|---------|--------|
-| [commandclaw](https://github.com/FnSK4R17s/commandclaw) | Agent runtime, Telegram I/O, tracing | Guiding docs done, code pending |
+| [commandclaw](https://github.com/FnSK4R17s/commandclaw) | Agent runtime, Telegram I/O, tracing | ✅ All phases implemented (30 files, 49 tests) |
 | [commandclaw-mcp](https://github.com/FnSK4R17s/commandclaw-mcp) | MCP gateway — credential proxy with rotating keys | ✅ README done, code pending |
 | [commandclaw-skills](https://github.com/FnSK4R17s/commandclaw-skills) | Skills library — `npx skills add FnSK4R17s/commandclaw-skills` | ✅ Done (bash, github, file-ops) |
 | [commandclaw-vault](https://github.com/FnSK4R17s/commandclaw-vault) | Vault template — clone to create a new agent | ✅ Done (Obsidian pre-configured) |
+| [commandclaw-observe](https://github.com/FnSK4R17s/commandclaw-observe) | Observability — Langfuse + Prometheus + Grafana | ✅ Done |
 
 ## Project Structure (commandclaw)
 

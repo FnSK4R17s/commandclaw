@@ -1,0 +1,12 @@
+services:
+  agent:
+    build: .
+    env_file: .env
+    volumes:
+      - vault:/vault
+    environment:
+      - COMMANDCLAW_VAULT_PATH=/vault
+    restart: unless-stopped
+
+volumes:
+  vault:
