@@ -28,11 +28,12 @@ async def create_agent(
 
     This is called ONCE at startup. The agent_executor is reused across invocations.
     """
-    from langchain.agents import AgentExecutor, create_openai_tools_agent
-    from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
     from langchain_openai import ChatOpenAI
+    from langgraph.prebuilt import create_react_agent
 
     from commandclaw.agent.tools.bash_tool import create_bash_tool
+    from commandclaw.agent.tools.file_delete import create_file_delete_tool
+    from commandclaw.agent.tools.file_list import create_file_list_tool
     from commandclaw.agent.tools.file_read import create_file_read_tool
     from commandclaw.agent.tools.file_write import create_file_write_tool
     from commandclaw.agent.tools.vault_memory import (
@@ -61,8 +62,10 @@ async def create_agent(
     # --- Native tools ---
     tools: list[Any] = [
         create_bash_tool(vault_path, timeout=settings.bash_timeout),
+        create_file_list_tool(vault_path),
         create_file_read_tool(vault_path),
         create_file_write_tool(vault_path),
+        create_file_delete_tool(vault_path),
         create_memory_read_tool(vault_path),
         create_memory_write_tool(vault_path, repo),
         create_list_skills_tool(vault_path),
@@ -96,21 +99,8 @@ async def create_agent(
         llm_kwargs["base_url"] = settings.openai_base_url
     llm = ChatOpenAI(**llm_kwargs)
 
-    # --- Agent ---
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "{system_prompt}"),
-        ("human", "{input}"),
-        MessagesPlaceholder("agent_scratchpad"),
-    ])
-
-    agent = create_openai_tools_agent(llm, tools, prompt)
-    agent_executor = AgentExecutor(
-        agent=agent,
-        tools=tools,
-        verbose=False,
-        handle_parsing_errors=True,
-        max_iterations=25,
-    )
+    # --- Agent (LangGraph ReAct) ---
+    agent_executor = create_react_agent(llm, tools)
 
     # --- Cleanup ---
     async def cleanup() -> None:
@@ -140,6 +130,8 @@ async def invoke_agent(
     user_id: str | None = None,
 ) -> AgentResult:
     """Run the agent on a single user message. Fresh vault read each time."""
+    from langchain_core.messages import HumanMessage, SystemMessage
+
     from commandclaw.agent.prompt import build_system_prompt
     from commandclaw.tracing.langfuse_tracing import create_langfuse_handler
     from commandclaw.vault.agent_config import load_agent_config
@@ -165,23 +157,32 @@ async def invoke_agent(
             skills=skills,
         )
 
+        # Build messages for LangGraph ReAct agent
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=message),
+        ]
+
         # Tracing callback (may be None)
-        callbacks: list[Any] = []
+        config: dict[str, Any] = {}
         langfuse_handler = create_langfuse_handler(settings, session_id, user_id)
         if langfuse_handler is not None:
-            callbacks.append(langfuse_handler)
+            config["callbacks"] = [langfuse_handler]
 
-        # Invoke
-        config: dict[str, Any] = {}
-        if callbacks:
-            config["callbacks"] = callbacks
-
+        # Invoke LangGraph agent
         result = await agent_executor.ainvoke(
-            {"input": message, "system_prompt": system_prompt},
+            {"messages": messages},
             config=config,
         )
 
-        return AgentResult(output=result.get("output", ""), success=True)
+        # Extract the last AI message as output
+        ai_messages = [
+            m for m in result.get("messages", [])
+            if hasattr(m, "type") and m.type == "ai" and m.content
+        ]
+        output = ai_messages[-1].content if ai_messages else ""
+
+        return AgentResult(output=output, success=True)
 
     except KeyboardInterrupt:
         raise

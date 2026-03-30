@@ -19,9 +19,21 @@ class Settings(BaseSettings):
     )
 
     # --- Vault ---
-    vault_path: Path = Field(
-        default=Path.cwd(),
-        description="Absolute path to the agent vault (git repo).",
+    vault_path: Path | None = Field(
+        default=None,
+        description="Explicit vault path. If unset, workspace manager assigns one.",
+    )
+    vault_template: Path = Field(
+        default=Path("/apps/commandclaw-vault"),
+        description="Path to the vault template repo (commandclaw-vault).",
+    )
+    agent_id: str = Field(
+        default="default",
+        description="Agent identity — used for workspace naming (cclaw-<agent-id>-<uuid>).",
+    )
+    reuse_workspace: bool = Field(
+        default=True,
+        description="Reuse the latest workspace for this agent_id, or create fresh each time.",
     )
 
     # --- LLM ---
@@ -30,7 +42,7 @@ class Settings(BaseSettings):
         description="OpenAI API key (or Codex OAuth access token).",
     )
     openai_model: str = Field(
-        default="gpt-4o",
+        default="gpt-5.4-mini",
         description="OpenAI model to use for the agent.",
     )
     openai_temperature: float = Field(default=0.2, ge=0.0, le=2.0)

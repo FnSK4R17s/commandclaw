@@ -13,22 +13,74 @@
 ---
 
 > [!WARNING]
-> **🚧 Beta Software** — This project is under active development. Workflows and commands may be incomplete or broken. Your feedback helps make this better!
+> **Beta Software** — This project is under active development. Workflows and commands may be incomplete or broken. Your feedback helps make this better!
 >
-> 💬 **Have feedback or found a bug?**  Reach out at [**@_Shikh4r_** on X](https://x.com/_Shikh4r_)
+> Have feedback or found a bug?  Reach out at [**@_Shikh4r_** on X](https://x.com/_Shikh4r_)
 
 ## Quick Start
 
 ```bash
-# 1. Clone the vault template to create a new agent
-gh repo clone FnSK4R17s/commandclaw-vault my-agent
+# 1. Clone the repos
+gh repo clone FnSK4R17s/commandclaw
+gh repo clone FnSK4R17s/commandclaw-vault
 
-# 2. Install skills (select which ones to add)
-cd my-agent
-npx skills add FnSK4R17s/commandclaw-skills
+# 2. Configure
+cd commandclaw
+cp .env.example .env
+# Edit .env — set COMMANDCLAW_OPENAI_API_KEY
 
-# 3. Open in Obsidian (plugins are pre-configured)
+# 3. Spawn an agent (creates workspace + Docker container)
+./scripts/spawn-agent.sh
+# → Spawning agent: brave-panda-4821
+
+# 4. Resume an existing agent
+./scripts/spawn-agent.sh brave-panda-4821
+
+# 5. List all agents
+./scripts/spawn-agent.sh --list
 ```
+
+Each agent gets its own isolated workspace cloned from the [commandclaw-vault](https://github.com/FnSK4R17s/commandclaw-vault) template, named with the chakravarti-cli convention: `adjective-animal-NNNN`. The agent ID is the workspace name.
+
+```
+~/.commandclaw/workspaces/
+  brave-panda-4821/     ← Agent vault (Git repo)
+  swift-falcon-0137/    ← Another agent
+```
+
+## Containerized Agents
+
+Agents run inside persistent Docker containers with filesystem isolation:
+
+- `/workspace` — the vault, mounted from `~/.commandclaw/workspaces/<agent-id>/`
+- No host filesystem access beyond the vault
+- 512MB memory, 1 CPU limit
+- Read-only root filesystem, tmpfs for `/tmp` and `/home/agent`
+- Connected to the MCP gateway via Docker network
+
+```bash
+# Spawn new agent in container
+./scripts/spawn-agent.sh
+
+# Run locally (dev mode, no container)
+COMMANDCLAW_AGENT_ID=brave-panda-4821 python -m commandclaw chat
+```
+
+## Agent Tools
+
+| Tool | Description |
+|------|-------------|
+| `bash` | Execute shell commands (scoped to `/workspace` in container) |
+| `file_list` | List files and directories in the vault |
+| `file_read` | Read a file from the vault |
+| `file_write` | Create or overwrite a file in the vault |
+| `file_delete` | Delete a file from the vault |
+| `memory_read` | Read long-term memory and daily notes |
+| `memory_write` | Write to daily notes or long-term memory (auto-commits to Git) |
+| `list_skills` | Discover available skills |
+| `read_skill` | Load a skill's full instructions |
+
+All file tools are sandboxed to the vault directory. Path traversal outside the vault is rejected.
 
 ## Repositories
 
@@ -37,96 +89,73 @@ npx skills add FnSK4R17s/commandclaw-skills
 | [commandclaw](https://github.com/FnSK4R17s/commandclaw) | Agent runtime, Telegram I/O, tracing |
 | [commandclaw-mcp](https://github.com/FnSK4R17s/commandclaw-mcp) | MCP gateway — credential proxy with rotating keys |
 | [commandclaw-skills](https://github.com/FnSK4R17s/commandclaw-skills) | Skills library — `npx skills add FnSK4R17s/commandclaw-skills` |
-| [commandclaw-vault](https://github.com/FnSK4R17s/commandclaw-vault) | Vault template — clone to create a new agent |
-
-## Why Python?
-
-CommandClaw is I/O-bound, not CPU-bound. The agent spends 99%+ of its time waiting on external calls — LLM API responses (1-10s), subprocess execution, file I/O, Git operations, and Telegram API calls. Python's runtime speed is irrelevant here.
-
-Python was chosen over TypeScript because:
-
-- **LangChain's Python ecosystem is larger** — more integrations, better documentation, and first-class Langfuse support.
-- **Clean break from OpenClaw** — avoids inheriting patterns or dependencies from the codebase we're replacing.
-- **Simpler deployment** — single `pip install`, no build step, no bundler config.
+| [commandclaw-vault](https://github.com/FnSK4R17s/commandclaw-vault) | Vault template — cloned per agent workspace |
 
 ## Architecture
 
-See [guiding_docs/VISION.md](guiding_docs/VISION.md) for the full vision and [guiding_docs/PLAN.md](guiding_docs/PLAN.md) for the Week One implementation plan.
+See [guiding_docs/VISION.md](guiding_docs/VISION.md) for the full vision and [guiding_docs/PLAN.md](guiding_docs/PLAN.md) for the implementation plan.
 
 **Three layers:**
 
-1. **Agent Runtime** — LangChain + OpenAI execution loop. Each agent runs independently with its own Git vault.
+1. **Agent Runtime** — LangGraph + OpenAI execution loop. Each agent runs independently in its own container with its own Git vault.
 2. **Skills Layer** — Markdown files describing agent capabilities. Managed by admins, not agents.
 3. **MCP Layer** — Authentication-gated sensitive operations with access control at the protocol level.
 
 **Core principle:** The vault (Git repo) is the control plane, not chat. Configuration, memory, and behavior rules live in files you can inspect, edit, version, and audit.
 
-## Skills
+## Workspace-Per-Agent
 
-Skills are markdown files in `.agents/skills/` within each agent's vault. They describe capabilities the agent can use — the agent reads skill descriptions into context and loads full instructions on demand.
+Each agent gets an isolated workspace:
 
-**Install skills from the [commandclaw-skills](https://github.com/FnSK4R17s/commandclaw-skills) repo:**
+1. `spawn-agent.sh` generates an agent ID (`adjective-animal-NNNN`)
+2. Clones `commandclaw-vault` template into `~/.commandclaw/workspaces/<agent-id>/`
+3. Initializes a fresh Git repo for the vault
+4. Launches a Docker container with the vault mounted at `/workspace`
+
+The agent ID is the workspace name — no separate concept. Resume an agent by its name: `./scripts/spawn-agent.sh brave-panda-4821`
+
+## Configuration
+
+**Two config files**, both at `~/.commandclaw/` (outside Git):
+
+| File | Purpose | Who edits |
+|------|---------|-----------|
+| `mcp.json` | Gateway settings, upstream servers, credentials | DevOps/admin |
+| `agents.json` | Per-agent roles, tool grants, rate limits | Agent operators |
+
+**Environment variables** (`.env`):
 
 ```bash
-# Install skills into the current vault (select which ones to add)
-npx skills add FnSK4R17s/commandclaw-skills
+COMMANDCLAW_OPENAI_API_KEY=sk-...          # Required
+COMMANDCLAW_AGENT_ID=brave-panda-4821      # Resume specific agent (optional)
+COMMANDCLAW_OPENAI_MODEL=gpt-5.4-mini      # Default model
 ```
-
-Skills are managed by administrators, not agents. Agents can read and use skills but cannot install, update, or remove them. No skills ship with the vault by default — install what your agent needs.
 
 ## MCP
 
-OpenClaw agents interact with external tools via ad-hoc API calls — no authentication boundaries, no access control, no predictability. Any agent can call any API with whatever credentials are lying around. This is the single biggest security gap in the architecture.
+Agents interact with external tools via the [commandclaw-mcp](https://github.com/FnSK4R17s/commandclaw-mcp) gateway:
 
-CommandClaw uses [MCP](https://modelcontextprotocol.io/) to fix this:
-
-- **RBAC at the protocol level** — MCP servers control which tools an agent can see. Unauthorized tools are invisible, not just forbidden. Access control is enforced by the server, not by prompting the agent to behave.
-- **Deterministic tool calling** — MCP defines a structured request/response contract for every tool. No more hoping the agent formats an API call correctly. The protocol guarantees schema validation, typed inputs, and predictable outputs.
-- **Credentials never touch the agent** — API keys live in the MCP gateway, not in the agent's context. The agent calls a tool; the gateway authenticates with the real service. The agent never sees or leaks the key.
-- **Rotating keys limit blast radius** — agents authenticate to the gateway with a short-lived key that rotates every hour. Even if leaked via prompt injection or context dump, the key is dead within 60 minutes.
-
-### Architecture
+- **Phantom tokens** — agents get opaque, short-lived tokens. Real API keys never leave the gateway.
+- **HMAC-signed requests** — every request is signed, preventing forgery even with a stolen token.
+- **Dual-layer RBAC** — Cerbos policy engine filters tools at discovery and enforces at call time.
+- **Hourly key rotation** — leaked keys expire within 60 minutes.
 
 ```
-Agent → (rotating hourly key) → commandclaw-mcp gateway → (real credentials) → External MCP Servers
+Agent → (phantom token + HMAC) → commandclaw-mcp gateway → (real credentials) → External MCP Servers
 ```
 
-The [commandclaw-mcp](https://github.com/FnSK4R17s/commandclaw-mcp) gateway is a separate service that holds all real credentials and proxies tool calls. Agents only need the gateway URL and their current rotating key.
+## Skills
 
-**Gateway config** (`~/.commandclaw/mcp.json`) — lives outside the vault, never in Git:
+Skills are markdown files in `.agents/skills/` within each agent's vault:
 
-```json
-{
-  "gateway": {
-    "host": "0.0.0.0",
-    "port": 8420,
-    "key_rotation_interval_seconds": 3600
-  },
-  "servers": {
-    "notion": {
-      "command": "npx",
-      "args": ["-y", "@notionhq/notion-mcp-server"],
-      "env": { "NOTION_API_KEY": "ntn_..." }
-    },
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": { "GITHUB_TOKEN": "ghp_..." }
-    }
-  },
-  "access": {
-    "coding-agent": ["github", "notion"],
-    "research-agent": ["notion"]
-  }
-}
+```bash
+npx skills add FnSK4R17s/commandclaw-skills
 ```
+
+Skills are managed by administrators, not agents. Agents can read and use skills but cannot install, update, or remove them.
 
 ## Migrating from OpenClaw
-
-CommandClaw's vault structure is compatible with OpenClaw workspaces. Run the migration script to convert:
 
 ```bash
 ./scripts/migrate-from-openclaw.sh /path/to/openclaw/workspace /path/to/commandclaw/vault
 ```
-
-This handles renaming `.openclaw/` to `.commandclaw/`, moving `skills/` into `.agents/skills/`, and validating the vault structure.

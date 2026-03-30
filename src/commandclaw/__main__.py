@@ -34,6 +34,18 @@ def main() -> None:
         log.error("COMMANDCLAW_TELEGRAM_BOT_TOKEN is required (or use 'commandclaw chat')")
         sys.exit(1)
 
+    # Resolve vault path: explicit > workspace manager
+    if settings.vault_path is None:
+        from commandclaw.vault.workspace import create_workspace
+
+        agent_id, vault_path = create_workspace(
+            template_path=settings.vault_template,
+            agent_id=settings.agent_id if settings.agent_id != "default" else None,
+        )
+        settings.vault_path = vault_path
+        settings.agent_id = agent_id
+        log.info("Agent: %s", agent_id)
+
     log.info("CommandClaw starting — mode=%s vault=%s model=%s", mode, settings.vault_path, settings.openai_model)
 
     agent_executor, cleanup_fn = asyncio.run(_bootstrap(settings))
