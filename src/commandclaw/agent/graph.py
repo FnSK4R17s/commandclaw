@@ -259,7 +259,7 @@ def build_agent_graph(settings: Settings) -> Any:
     repo = VaultRepo(vault_path)
     repo.ensure_repo()
 
-    tools = [
+    tools: list[Any] = [
         create_bash_tool(vault_path, timeout=settings.bash_timeout),
         create_file_list_tool(vault_path),
         create_file_read_tool(vault_path),
@@ -273,6 +273,15 @@ def build_agent_graph(settings: Settings) -> Any:
         create_install_skill_tool(vault_path),
         create_system_info_tool(),
     ]
+
+    # --- MCP Gateway tools (optional) ---
+    # TODO: MCP streamable HTTP transport uses anyio task groups that conflict
+    # with LangGraph's asyncio runtime. The connection works in isolation but
+    # the cancel scopes cause issues when the MCP session stays alive alongside
+    # LangGraph graph invocations. For now, agents use native tools + bash.
+    # The gateway's /capabilities endpoint works independently.
+    if settings.mcp_gateway_url:
+        log.info("MCP gateway configured at %s (tool discovery deferred)", settings.mcp_gateway_url)
 
     # --- Langfuse tracing ---
     from commandclaw.tracing.langfuse_tracing import create_langfuse_handler

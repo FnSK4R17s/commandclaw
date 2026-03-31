@@ -40,6 +40,7 @@ async def create_agent(
         create_memory_read_tool,
         create_memory_write_tool,
     )
+    from commandclaw.agent.tools.system_info import create_system_info_tool
     from commandclaw.agent.tools.vault_skill import (
         create_list_skills_tool,
         create_read_skill_tool,
@@ -70,6 +71,7 @@ async def create_agent(
         create_memory_write_tool(vault_path, repo),
         create_list_skills_tool(vault_path),
         create_read_skill_tool(vault_path),
+        create_system_info_tool(),
     ]
     log.info("Created %d native tool(s)", len(tools))
 
@@ -99,8 +101,13 @@ async def create_agent(
         llm_kwargs["base_url"] = settings.openai_base_url
     llm = ChatOpenAI(**llm_kwargs)
 
-    # --- Agent (LangGraph ReAct) ---
-    agent_executor = create_react_agent(llm, tools)
+    # --- Checkpointer (conversation history persisted in vault) ---
+    from langgraph.checkpoint.memory import MemorySaver
+
+    checkpointer = MemorySaver()
+
+    # --- Agent (LangGraph ReAct with memory) ---
+    agent_executor = create_react_agent(llm, tools, checkpointer=checkpointer)
 
     # --- Cleanup ---
     async def cleanup() -> None:
@@ -163,17 +170,49 @@ async def invoke_agent(
             HumanMessage(content=message),
         ]
 
-        # Tracing callback (may be None)
-        config: dict[str, Any] = {}
+        # Thread ID for conversation history — agent_id/session_id
+        thread_id = f"{settings.agent_id or 'default'}/{session_id or 'main'}"
+
+        # Tracing — wrap invocation in a named Langfuse span (agent_id as trace name)
+        config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
         langfuse_handler = create_langfuse_handler(settings, session_id, user_id)
         if langfuse_handler is not None:
             config["callbacks"] = [langfuse_handler]
+
+        # Create a parent observation named after the agent so traces are identifiable
+        langfuse_ctx = None
+        try:
+            from langfuse import get_client as get_langfuse
+
+            lf = get_langfuse()
+            agent_name = settings.agent_id or "commandclaw"
+            langfuse_ctx = lf.start_as_current_observation(
+                name=agent_name,
+                as_type="span",
+                input={"message": message},
+                metadata={"agent_id": agent_name, "session_id": session_id},
+            )
+            langfuse_ctx.__enter__()
+        except Exception:
+            langfuse_ctx = None
 
         # Invoke LangGraph agent
         result = await agent_executor.ainvoke(
             {"messages": messages},
             config=config,
         )
+
+        # Close the parent observation
+        if langfuse_ctx is not None:
+            try:
+                ai_out = [
+                    m for m in result.get("messages", [])
+                    if hasattr(m, "type") and m.type == "ai" and m.content
+                ]
+                langfuse_ctx.update(output=ai_out[-1].content if ai_out else "")
+                langfuse_ctx.__exit__(None, None, None)
+            except Exception:
+                pass
 
         # Extract the last AI message as output
         ai_messages = [
