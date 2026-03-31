@@ -1,8 +1,8 @@
 FROM python:3.12-slim
 
-# System deps for git (vault operations) and basic tools
+# System deps for git, node/npm (skills), basic tools, and C++ compiler (annoy)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git curl \
+    && apt-get install -y --no-install-recommends git curl g++ nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Non-root user — agent runs as 'agent', not root
@@ -11,14 +11,26 @@ RUN groupadd -r agent && \
 
 WORKDIR /app
 
-# Install Python package
+# --- Layer 1: Dependencies only (cached unless pyproject.toml changes) ---
 COPY pyproject.toml README.md ./
+RUN mkdir -p src/commandclaw && \
+    echo '__version__ = "0.1.0"' > src/commandclaw/__init__.py && \
+    pip install --no-cache-dir --timeout=300 --retries=5 . && \
+    rm -rf src/commandclaw
+
+# Pre-download NeMo Guardrails embedding model (fastembed) so it's cached in the image
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5')" 2>/dev/null || true
+
+# --- Layer 2: Source code (fast — only rebuilds on code changes) ---
 COPY src/ src/
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --no-deps --force-reinstall .
 
 # Workspace is mounted at /workspace — the agent's vault
-# This is the ONLY writable directory the agent should have
 VOLUME /workspace
+
+# Entrypoint script — initializes vault from template if needed
+COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Agent home for any runtime state (sqlite checkpointer, etc.)
 RUN mkdir -p /home/agent/.commandclaw && \
@@ -27,7 +39,6 @@ RUN mkdir -p /home/agent/.commandclaw && \
 # Trust all git directories (workspace is mounted from host with different uid)
 RUN git config --system safe.directory '*'
 
-USER agent
 WORKDIR /workspace
 
 # Default env vars — overridden by docker-compose or spawn script
@@ -39,6 +50,6 @@ ENV PYTHONDONTWRITEBYTECODE=1
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD ["python", "-c", "print('ok')"]
 
-# Default: chat mode (telegram mode via override)
-ENTRYPOINT ["python", "-m", "commandclaw"]
+# Entrypoint: init vault from /vault-template if workspace is empty, then run agent
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["chat"]

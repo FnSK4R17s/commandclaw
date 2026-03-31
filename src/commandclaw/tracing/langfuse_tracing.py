@@ -1,64 +1,88 @@
-"""Langfuse observability — wraps LangChain agent runs with tracing."""
+"""Langfuse observability — v4 SDK with LangChain CallbackHandler."""
 
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from commandclaw.config import Settings
 
-if TYPE_CHECKING:
-    from langfuse.callback import CallbackHandler
-
 log = logging.getLogger(__name__)
 
-# Module-level reference so flush_tracing() can reach the client.
 _langfuse_client: Any = None
+_initialized = False
+
+
+def _ensure_langfuse(settings: Settings) -> bool:
+    """Initialize the Langfuse singleton once. Returns True if ready."""
+    global _langfuse_client, _initialized  # noqa: PLW0603
+
+    if _initialized:
+        return _langfuse_client is not None
+
+    _initialized = True
+
+    if not settings.langfuse_public_key or not settings.langfuse_secret_key:
+        log.warning("Langfuse keys not set — tracing disabled.")
+        return False
+
+    try:
+        from langfuse import Langfuse
+
+        _langfuse_client = Langfuse(
+            public_key=settings.langfuse_public_key,
+            secret_key=settings.langfuse_secret_key,
+            host=settings.langfuse_host,
+        )
+        log.info("Langfuse v4 initialized (host=%s).", settings.langfuse_host)
+        return True
+    except ImportError:
+        log.warning("langfuse package not installed — tracing disabled.")
+        return False
+    except Exception:
+        log.exception("Failed to initialize Langfuse — tracing disabled.")
+        return False
 
 
 def create_langfuse_handler(
     settings: Settings,
     session_id: str | None = None,
     user_id: str | None = None,
-) -> CallbackHandler | None:
-    """Create a Langfuse CallbackHandler for LangChain if credentials are configured.
+) -> Any | None:
+    """Create a Langfuse CallbackHandler for LangChain/LangGraph.
 
-    Returns ``None`` when Langfuse is not configured (keys missing) or when the
-    ``langfuse`` package is not installed.  Errors during handler creation are
-    caught so tracing failures never crash the agent.
+    In v4, session_id and user_id are propagated via context, not constructor args.
+    The trace name is set to the agent_id so each agent is identifiable in the UI.
     """
-    global _langfuse_client  # noqa: PLW0603
-
-    if not settings.langfuse_public_key or not settings.langfuse_secret_key:
-        log.warning("Langfuse keys not set — tracing disabled.")
+    if not _ensure_langfuse(settings):
         return None
 
     try:
-        from langfuse.callback import CallbackHandler as LangfuseCallbackHandler
-    except ImportError:
-        log.warning("langfuse package not installed — tracing disabled.")
-        return None
+        from langfuse.langchain import CallbackHandler
 
-    try:
-        handler = LangfuseCallbackHandler(
-            public_key=settings.langfuse_public_key,
-            secret_key=settings.langfuse_secret_key,
-            host=settings.langfuse_host,
-            session_id=session_id,
-            user_id=user_id,
-            trace_name="commandclaw-agent",
-        )
-        # Keep a reference to the underlying Langfuse client for flushing.
-        _langfuse_client = handler.langfuse
-        log.debug("Langfuse tracing handler created (session=%s).", session_id)
-        return handler  # type: ignore[return-value]
+        handler = CallbackHandler()
+
+        # v4: propagate attributes — agent_id as trace name for multi-agent filtering
+        try:
+            from langfuse import propagate_attributes
+
+            propagate_attributes(
+                trace_name=settings.agent_id or "commandclaw",
+                session_id=session_id,
+                user_id=user_id,
+                tags=["commandclaw"],
+            )
+        except ImportError:
+            pass
+
+        return handler
     except Exception:
-        log.exception("Failed to create Langfuse handler — tracing disabled.")
+        log.exception("Failed to create Langfuse handler.")
         return None
 
 
 def flush_tracing() -> None:
-    """Flush any pending Langfuse events.  Call on shutdown."""
+    """Flush any pending Langfuse events. Call on shutdown."""
     if _langfuse_client is None:
         return
     try:

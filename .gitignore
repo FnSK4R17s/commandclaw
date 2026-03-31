@@ -39,3 +39,9 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+
+# Local agent/tool state
+.chakravarti/
+.commandclaw/
+.beary/
+.agents/

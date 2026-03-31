@@ -1,12 +1,27 @@
 services:
   agent:
     build: .
+    image: commandclaw:latest
     env_file: .env
-    volumes:
-      - vault:/vault
     environment:
-      - COMMANDCLAW_VAULT_PATH=/vault
-    restart: unless-stopped
+      - COMMANDCLAW_VAULT_PATH=/workspace
+      - COMMANDCLAW_LANGFUSE_HOST=http://langfuse-web:3000
+      - OPENAI_API_KEY=${COMMANDCLAW_OPENAI_API_KEY}
+    volumes:
+      - ./vault:/workspace
+    stdin_open: true
+    tty: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=100m
+      - /home/agent:size=50m
+    mem_limit: 512m
+    cpus: 1
+    networks:
+      - observe
+    command: ["chat"]
 
-volumes:
-  vault:
+networks:
+  observe:
+    external: true
+    name: commandclaw-observe_default
