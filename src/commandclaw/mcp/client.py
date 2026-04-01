@@ -1,29 +1,30 @@
-"""Connect to commandclaw-mcp gateway, discover available tools.
+"""Raw httpx-based MCP client — no anyio, no MCP SDK transport.
 
-Supports two auth modes:
-1. Phantom token + HMAC (full gateway auth — production)
-2. Simple Bearer token (for testing / third-party MCP servers)
+Speaks JSON-RPC 2.0 directly to the commandclaw-mcp gateway via HTTP POST.
+Avoids the anyio/asyncio conflict that the MCP SDK's streamablehttp_client
+causes when used alongside LangGraph's asyncio event loop.
+
+Auth: bootstraps a phantom session via POST /sessions, then sends
+Authorization: Bearer <phantom_token> on all /mcp requests.
 """
 
 from __future__ import annotations
 
-import hashlib
-import hmac as hmac_mod
 import logging
-import time
-import uuid
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urlparse
 
 import httpx
 
-from mcp.client.session import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
-
 log = logging.getLogger(__name__)
 
-_CONNECT_TIMEOUT = 30.0
+_TIMEOUT = 30.0
+
+# JSON-RPC headers for MCP protocol
+_MCP_HEADERS = {
+    "Content-Type": "application/json",
+    "Accept": "application/json, text/event-stream",
+}
 
 
 @dataclass
@@ -47,44 +48,143 @@ class GatewaySession:
 
 @dataclass
 class MCPClient:
-    """Async client for the commandclaw-mcp gateway.
+    """Async MCP client using raw httpx — no anyio, no MCP SDK transport.
 
     Usage::
 
         async with MCPClient(gateway_url=url, agent_id=agent_id) as client:
             tools = await client.list_tools()
             result = await client.call_tool("my_tool", {"arg": "value"})
-
-    For simple Bearer auth (non-gateway MCP servers)::
-
-        client = MCPClient(gateway_url=url, agent_key="bearer-token")
     """
 
     gateway_url: str
     agent_id: str = ""
-    agent_key: str = ""  # Simple bearer token (fallback)
+    agent_key: str = ""  # Simple bearer token (for non-gateway servers)
 
     # Private state
-    _session: ClientSession | None = field(default=None, repr=False, init=False)
-    _transport_cm: Any = field(default=None, repr=False, init=False)
-    _session_cm: Any = field(default=None, repr=False, init=False)
+    _http: httpx.AsyncClient | None = field(default=None, repr=False, init=False)
     _gateway_session: GatewaySession | None = field(default=None, repr=False, init=False)
+    _request_id: int = field(default=0, repr=False, init=False)
+    _mcp_session_id: str | None = field(default=None, repr=False, init=False)
+    _initialized: bool = field(default=False, repr=False, init=False)
 
-    # -- gateway auth -------------------------------------------------------
+    # -- helpers ------------------------------------------------------------
+
+    def _next_id(self) -> int:
+        self._request_id += 1
+        return self._request_id
+
+    def _auth_headers(self) -> dict[str, str]:
+        """Bearer token header from phantom session or agent_key."""
+        if self._gateway_session:
+            return {"Authorization": f"Bearer {self._gateway_session.phantom_token}"}
+        if self.agent_key:
+            return {"Authorization": f"Bearer {self.agent_key}"}
+        return {}
+
+    def _request_headers(self) -> dict[str, str]:
+        """Full headers for a JSON-RPC POST to /mcp."""
+        headers = {**_MCP_HEADERS, **self._auth_headers()}
+        if self._mcp_session_id:
+            headers["Mcp-Session-Id"] = self._mcp_session_id
+        return headers
+
+    async def _jsonrpc(self, method: str, params: dict[str, Any] | None = None) -> Any:
+        """Send a JSON-RPC 2.0 request and return the result.
+
+        Raises RuntimeError on JSON-RPC errors or HTTP errors.
+        """
+        if self._http is None:
+            raise RuntimeError("MCPClient not connected — call connect() first")
+
+        payload = {
+            "jsonrpc": "2.0",
+            "id": self._next_id(),
+            "method": method,
+        }
+        if params is not None:
+            payload["params"] = params
+
+        resp = await self._http.post(
+            self.gateway_url,
+            json=payload,
+            headers=self._request_headers(),
+        )
+        resp.raise_for_status()
+
+        # Capture Mcp-Session-Id from response if present
+        session_id = resp.headers.get("mcp-session-id")
+        if session_id:
+            self._mcp_session_id = session_id
+
+        # Parse response — gateway may return JSON or SSE (text/event-stream)
+        content_type = resp.headers.get("content-type", "")
+        if "text/event-stream" in content_type:
+            data = _parse_sse_response(resp.text)
+        else:
+            data = resp.json()
+
+        # Check for JSON-RPC error
+        if "error" in data:
+            err = data["error"]
+            code = err.get("code", -1)
+            msg = err.get("message", "Unknown error")
+            raise RuntimeError(f"MCP JSON-RPC error ({code}): {msg}")
+
+        return data.get("result")
+
+    # -- lifecycle ----------------------------------------------------------
+
+    async def connect(self) -> None:
+        """Bootstrap phantom session and initialize the MCP protocol."""
+        if self._initialized:
+            return
+
+        # Ensure trailing slash — Starlette mount redirects /mcp to /mcp/
+        if not self.gateway_url.endswith("/"):
+            self.gateway_url += "/"
+
+        self._http = httpx.AsyncClient(timeout=_TIMEOUT)
+
+        # Bootstrap phantom session (gateway mode)
+        if self.agent_id and not self.agent_key:
+            self._gateway_session = await self._bootstrap_session()
+
+        # MCP protocol initialize handshake
+        log.info("Initializing MCP protocol at %s", self.gateway_url)
+        result = await self._jsonrpc("initialize", {
+            "protocolVersion": "2025-03-26",
+            "capabilities": {"tools": {}},
+            "clientInfo": {"name": "commandclaw", "version": "1.0.0"},
+        })
+
+        # Send initialized notification (no response expected)
+        notif = {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized",
+        }
+        await self._http.post(
+            self.gateway_url,
+            json=notif,
+            headers=self._request_headers(),
+        )
+
+        self._initialized = True
+        proto = result.get("protocolVersion", "?") if result else "?"
+        server = (result.get("serverInfo", {}) or {}).get("name", "?") if result else "?"
+        log.info("MCP initialized — server=%s protocol=%s", server, proto)
 
     async def _bootstrap_session(self) -> GatewaySession:
         """Create a phantom session via POST /sessions."""
-        # Strip trailing /mcp path to get the gateway base URL
         base = self.gateway_url.rstrip("/")
         if base.endswith("/mcp"):
             base = base[:-4]
         sessions_url = f"{base}/sessions"
 
-        log.info("Bootstrapping gateway session for agent %s at %s", self.agent_id, sessions_url)
-        async with httpx.AsyncClient(timeout=_CONNECT_TIMEOUT) as http:
-            resp = await http.post(sessions_url, json={"agent_id": self.agent_id})
-            resp.raise_for_status()
-            data = resp.json()
+        log.info("Bootstrapping gateway session for agent %s", self.agent_id)
+        resp = await self._http.post(sessions_url, json={"agent_id": self.agent_id})
+        resp.raise_for_status()
+        data = resp.json()
 
         session = GatewaySession(
             phantom_token=data["phantom_token"],
@@ -95,113 +195,39 @@ class MCPClient:
         log.info("Gateway session created, expires %s", session.expires_at)
         return session
 
-    def _sign_headers(self, method: str, path: str, body: bytes = b"") -> dict[str, str]:
-        """Build phantom token + HMAC auth headers for a request."""
-        if self._gateway_session is None:
-            raise RuntimeError("No gateway session — call connect() first")
-
-        timestamp = str(int(time.time()))
-        nonce = uuid.uuid4().hex
-        body_hash = hashlib.sha256(body).hexdigest()
-        canonical = f"{method}\n{path}\n{timestamp}\n{nonce}\n{body_hash}"
-        signature = hmac_mod.new(
-            self._gateway_session.hmac_key.encode(),
-            canonical.encode(),
-            hashlib.sha256,
-        ).hexdigest()
-
-        return {
-            "X-Phantom-Token": self._gateway_session.phantom_token,
-            "X-Timestamp": timestamp,
-            "X-Signature": signature,
-            "X-Nonce": nonce,
-        }
-
-    def _build_headers(self) -> dict[str, str]:
-        """Build request headers — phantom token as Bearer or simple key."""
-        if self._gateway_session:
-            # MCP streamable HTTP transport uses static headers, so we send
-            # the phantom token as Bearer. The gateway accepts this as fallback.
-            return {"Authorization": f"Bearer {self._gateway_session.phantom_token}"}
-        elif self.agent_key:
-            return {"Authorization": f"Bearer {self.agent_key}"}
-        return {}
-
-    # -- lifecycle ----------------------------------------------------------
-
-    async def connect(self) -> None:
-        """Initialize connection to the MCP gateway."""
-        if self._session is not None:
-            log.debug("MCPClient already connected — skipping")
-            return
-
-        # Bootstrap phantom session if we have an agent_id (gateway mode)
-        if self.agent_id and not self.agent_key:
-            self._gateway_session = await self._bootstrap_session()
-
-        headers = self._build_headers()
-        log.info("Connecting to MCP gateway at %s", self.gateway_url)
-
-        try:
-            self._transport_cm = streamablehttp_client(
-                url=self.gateway_url,
-                headers=headers,
-                timeout=_CONNECT_TIMEOUT,
-            )
-            read_stream, write_stream, _ = await self._transport_cm.__aenter__()
-
-            self._session_cm = ClientSession(read_stream, write_stream)
-            self._session = await self._session_cm.__aenter__()
-            await self._session.initialize()
-            log.info("MCP session initialized successfully")
-        except Exception:
-            log.exception("Failed to connect to MCP gateway")
-            await self._cleanup()
-            raise
-
     async def disconnect(self) -> None:
-        """Close the session and transport cleanly."""
-        log.info("Disconnecting from MCP gateway")
-        await self._cleanup()
-
-    async def _cleanup(self) -> None:
-        for cm_attr in ("_session_cm", "_transport_cm"):
-            cm = getattr(self, cm_attr, None)
-            if cm is not None:
-                try:
-                    await cm.__aexit__(None, None, None)
-                except Exception:
-                    log.debug("Ignoring error while closing %s", cm_attr)
-            setattr(self, cm_attr, None)
-        self._session = None
+        """Close the HTTP client."""
+        if self._http:
+            await self._http.aclose()
+            self._http = None
+        self._initialized = False
+        self._mcp_session_id = None
+        log.info("MCP client disconnected")
 
     async def __aenter__(self) -> MCPClient:
         await self.connect()
         return self
 
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    async def __aexit__(self, *exc: Any) -> None:
         await self.disconnect()
 
     # -- operations ---------------------------------------------------------
 
     @property
     def is_gateway_authenticated(self) -> bool:
-        """Whether we have an active phantom session with the gateway."""
         return self._gateway_session is not None
 
     async def list_tools(self) -> list[MCPToolDef]:
         """Discover available tools from the gateway."""
-        if self._session is None:
-            raise RuntimeError("MCPClient is not connected — call connect() first")
+        result = await self._jsonrpc("tools/list", {})
 
-        result = await self._session.list_tools()
         tools: list[MCPToolDef] = []
-        for tool in result.tools:
+        for tool_data in (result or {}).get("tools", []):
             tools.append(
                 MCPToolDef(
-                    name=tool.name,
-                    description=tool.description or "",
-                    input_schema=tool.inputSchema,
+                    name=tool_data["name"],
+                    description=tool_data.get("description", ""),
+                    input_schema=tool_data.get("inputSchema", {}),
                 )
             )
         log.info("Discovered %d MCP tool(s): %s", len(tools), [t.name for t in tools])
@@ -209,26 +235,40 @@ class MCPClient:
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> str:
         """Call an MCP tool and return the text result."""
-        if self._session is None:
-            raise RuntimeError("MCPClient is not connected — call connect() first")
-
         log.debug("Calling MCP tool %r with %s", name, arguments)
-        result = await self._session.call_tool(name, arguments)
+        result = await self._jsonrpc("tools/call", {
+            "name": name,
+            "arguments": arguments,
+        })
 
-        if result.isError:
-            msg = _extract_text(result.content)
+        if not result:
+            return ""
+
+        if result.get("isError"):
+            msg = _extract_text(result.get("content", []))
             log.error("MCP tool %r returned error: %s", name, msg)
             raise RuntimeError(f"MCP tool {name!r} error: {msg}")
 
-        text = _extract_text(result.content)
-        log.debug("MCP tool %r returned %d chars", name, len(text))
-        return text
+        return _extract_text(result.get("content", []))
 
 
-def _extract_text(content: list[Any]) -> str:
-    """Concatenate text content blocks from a CallToolResult."""
+def _parse_sse_response(text: str) -> dict[str, Any]:
+    """Parse a text/event-stream response to extract the JSON-RPC message.
+
+    SSE format: 'event: message\\ndata: {json}\\n\\n'
+    """
+    import json
+
+    for line in text.splitlines():
+        if line.startswith("data: "):
+            return json.loads(line[6:])
+    raise RuntimeError(f"No data line found in SSE response: {text[:200]}")
+
+
+def _extract_text(content: list[dict[str, Any]]) -> str:
+    """Concatenate text content blocks from a JSON-RPC tool result."""
     parts: list[str] = []
     for block in content:
-        if hasattr(block, "text"):
-            parts.append(block.text)
+        if isinstance(block, dict) and block.get("type") == "text":
+            parts.append(block.get("text", ""))
     return "\n".join(parts) if parts else ""

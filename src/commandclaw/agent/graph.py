@@ -10,6 +10,7 @@ Replaces the prompt-heavy runtime with code-structural behavior:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -274,14 +275,21 @@ def build_agent_graph(settings: Settings) -> Any:
         create_system_info_tool(),
     ]
 
-    # --- MCP Gateway tools (optional) ---
-    # TODO: MCP streamable HTTP transport uses anyio task groups that conflict
-    # with LangGraph's asyncio runtime. The connection works in isolation but
-    # the cancel scopes cause issues when the MCP session stays alive alongside
-    # LangGraph graph invocations. For now, agents use native tools + bash.
-    # The gateway's /capabilities endpoint works independently.
+    # --- MCP Gateway tools (lazy-loaded on first invocation) ---
+    # Uses raw httpx JSON-RPC — no anyio, no MCP SDK transport.
+    _mcp_client = None
     if settings.mcp_gateway_url:
-        log.info("MCP gateway configured at %s (tool discovery deferred)", settings.mcp_gateway_url)
+        from commandclaw.mcp.client import MCPClient
+
+        _mcp_client = MCPClient(
+            gateway_url=settings.mcp_gateway_url,
+            agent_id=settings.agent_id or "default",
+            agent_key=settings.mcp_agent_key or "",
+        )
+        log.info("MCP gateway configured at %s (tools loaded on first invocation)", settings.mcp_gateway_url)
+
+    _mcp_loaded = False
+    _mcp_lock = asyncio.Lock()
 
     # --- Langfuse tracing ---
     from commandclaw.tracing.langfuse_tracing import create_langfuse_handler
@@ -296,6 +304,24 @@ def build_agent_graph(settings: Settings) -> Any:
     # --- Outer graph ---
     async def run_agent(state: CommandClawState) -> dict[str, Any]:
         """Run the inner ReAct agent with the identity prompt injected."""
+        nonlocal inner_agent, _mcp_loaded
+
+        # Lazy MCP tool discovery — runs once on first invocation
+        if _mcp_client and not _mcp_loaded:
+            async with _mcp_lock:
+                if not _mcp_loaded:  # Double-check after acquiring lock
+                    try:
+                        from commandclaw.mcp.tools import create_mcp_tools
+
+                        await _mcp_client.connect()
+                        mcp_tools = await create_mcp_tools(_mcp_client)
+                        tools.extend(mcp_tools)
+                        inner_agent = create_react_agent(llm, tools)
+                        log.info("Loaded %d MCP tool(s) from gateway", len(mcp_tools))
+                    except Exception:
+                        log.exception("MCP tool loading failed — continuing without MCP tools")
+                    _mcp_loaded = True
+
         # Build messages: system prompt + conversation history
         identity = state.get("identity_prompt", "You are a helpful assistant.")
         system_msg = SystemMessage(content=identity)
