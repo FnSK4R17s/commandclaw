@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"Stop\",\"additionalContext\":\"Reminder: if this session produced changes worth remembering, write a devlog entry per guiding_docs/devlog/INSTRUCTIONS.md and add a row to guiding_docs/DEVLOG.md before stopping.\"}}'"
+          }
+        ]
+      }
+    ]
+  }
+}

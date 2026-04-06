@@ -14,9 +14,9 @@ if [ ! -f "${WORKSPACE}/IDENTITY.md" ] && [ -d "${TEMPLATE}" ]; then
     # Remove template's .git and init fresh
     rm -rf "${WORKSPACE}/.git"
     cd "${WORKSPACE}"
-    git config --global user.email "agent@commandclaw.local"
-    git config --global user.name "${COMMANDCLAW_AGENT_ID:-commandclaw}"
     git init -q
+    git config user.email "agent@commandclaw.local"
+    git config user.name "${COMMANDCLAW_AGENT_ID:-commandclaw}"
     git add -A
     git commit -q -m "init: ${COMMANDCLAW_AGENT_ID:-agent} from vault template"
     echo "Vault initialized."

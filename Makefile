@@ -4,9 +4,9 @@
 build:
 	docker build -t commandclaw:latest .
 
-# Spawn a new agent (auto-generated ID, bootstraps on first run)
+# Spawn a new agent (auto-generated ID, or resume with ID=<agent-id>)
 agent:
-	@./scripts/spawn-agent.sh
+	@./scripts/spawn-agent.sh $(ID)
 
 # Spawn a new agent in admin mode (writable fs, can install packages/skills)
 agent-admin:

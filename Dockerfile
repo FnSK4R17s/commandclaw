@@ -18,8 +18,13 @@ RUN mkdir -p src/commandclaw && \
     pip install --no-cache-dir --timeout=300 --retries=5 . && \
     rm -rf src/commandclaw
 
-# Pre-download NeMo Guardrails embedding model (fastembed) so it's cached in the image
-RUN python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5')" 2>/dev/null || true
+# Pre-download NeMo Guardrails embedding model (fastembed) into a fixed cache path.
+# FASTEMBED_CACHE_PATH must match at build-time and runtime so the model is found.
+ENV FASTEMBED_CACHE_PATH=/opt/fastembed_cache
+ENV HF_HOME=/opt/hf_cache
+RUN python -c "from fastembed import TextEmbedding; \
+    TextEmbedding('BAAI/bge-small-en-v1.5'); \
+    TextEmbedding('sentence-transformers/all-MiniLM-L6-v2')"
 
 # --- Layer 2: Source code (fast — only rebuilds on code changes) ---
 COPY src/ src/

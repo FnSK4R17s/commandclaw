@@ -278,7 +278,9 @@ def build_agent_graph(settings: Settings) -> Any:
     # --- MCP Gateway tools (lazy-loaded on first invocation) ---
     # Uses raw httpx JSON-RPC — no anyio, no MCP SDK transport.
     _mcp_client = None
+    _mcp_client_module = None
     if settings.mcp_gateway_url:
+        from commandclaw.mcp import client as _mcp_client_module
         from commandclaw.mcp.client import MCPClient
 
         _mcp_client = MCPClient(
@@ -318,6 +320,11 @@ def build_agent_graph(settings: Settings) -> Any:
                         tools.extend(mcp_tools)
                         inner_agent = create_react_agent(llm, tools)
                         log.info("Loaded %d MCP tool(s) from gateway", len(mcp_tools))
+                    except (
+                        _mcp_client_module.MCPGatewayUnavailable,
+                        _mcp_client_module.MCPAgentNotEnrolled,
+                    ) as exc:
+                        log.warning("MCP unavailable — continuing without MCP tools: %s", exc)
                     except Exception:
                         log.exception("MCP tool loading failed — continuing without MCP tools")
                     _mcp_loaded = True

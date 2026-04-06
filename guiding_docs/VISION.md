@@ -96,3 +96,18 @@ The agent's vault — not chat — should be the control plane. Configuration, m
 Command Claw is agent infrastructure built for control and visibility. It exists because OpenClaw proved the demand for autonomous agents but failed on the architecture that enterprises require: auditability, reliability, direct configurability, and security boundaries.
 
 The name says it: Command. You command your agents. They don't command you.
+
+## Preliminary Research
+
+Whitepapers produced during the design phase. These inform the architectural decisions in this document.
+
+- [Agent Logic Refactor](../whitepaper-output/agent-logic-refactor/whitepaper/agent-logic-refactor-whitepaper.md) — refactor of the agent execution loop
+- [Agent Memory Architecture](../whitepaper-output/agent-memory-architecture/whitepaper/agent-memory-architecture-whitepaper.md) — vault-based memory model
+- [Agent Privilege Management](../whitepaper-output/agent-privilege-management/whitepaper/agent-privilege-management-whitepaper.md) — RBAC, sandboxing, and access control
+- [MCP Gateway Architecture](../whitepaper-output/mcp-gateway-architecture/whitepaper/mcp-gateway-architecture-whitepaper.md) — credential proxy and key rotation design
+- [MCP Gateway Testing](../whitepaper-output/mcp-gateway-testing/whitepaper/mcp-gateway-testing-whitepaper.md) — test strategy for the MCP gateway
+- [MCP + LangGraph Integration](../whitepaper-output/mcp-langgraph-integration/whitepaper/mcp-langgraph-integration-whitepaper.md) — how MCP tools plug into the LangGraph runtime
+
+## See Also
+
+- [DEVLOG.md](DEVLOG.md) — daily development log

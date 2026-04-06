@@ -93,7 +93,7 @@ All file tools are sandboxed to the vault directory. Path traversal outside the 
 
 ## Architecture
 
-See [guiding_docs/VISION.md](guiding_docs/VISION.md) for the full vision and [guiding_docs/PLAN.md](guiding_docs/PLAN.md) for the implementation plan.
+See [guiding_docs/VISION.md](guiding_docs/VISION.md) for the full vision and [guiding_docs/DEVLOG.md](guiding_docs/DEVLOG.md) for the daily development log.
 
 **Three layers:**
 
