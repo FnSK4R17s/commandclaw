@@ -24,6 +24,8 @@ Each repo appends a third (or third + fourth) emoji that represents its purpose:
 | **commandclaw-mcp** | Lock | ⚓🦞🔐 | Security gateway, credential isolation |
 | **commandclaw-skills** | Flexed Bicep | ⚓🦞💪 | Skills = capabilities, strength |
 | **commandclaw-observe** | Telescope | ⚓🦞🔭 | Observability, looking into agent runs |
+| **commandclaw-wiki** | Books | ⚓🦞📚 | The shared library — stacked pages of accumulated knowledge |
+| **commandclaw-memory** | Brain | ⚓🦞🧠 | The recall machinery — distillation, retrieval, remembering |
 
 ## How to Generate
 
