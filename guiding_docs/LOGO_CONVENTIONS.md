@@ -26,6 +26,7 @@ Each repo appends a third (or third + fourth) emoji that represents its purpose:
 | **commandclaw-observe** | Telescope | ⚓🦞🔭 | Observability, looking into agent runs |
 | **commandclaw-wiki** | Books | ⚓🦞📚 | The shared library — stacked pages of accumulated knowledge |
 | **commandclaw-memory** | Brain | ⚓🦞🧠 | The recall machinery — distillation, retrieval, remembering |
+| **commandclaw-gateway** | Door | ⚓🦞🚪 | The LLM routing layer — virtual keys, provider routing, cost governance |
 
 ## How to Generate
 

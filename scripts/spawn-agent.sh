@@ -4,16 +4,11 @@
 # Usage:
 #   ./scripts/spawn-agent.sh                    # New agent (auto-generated ID)
 #   ./scripts/spawn-agent.sh brave-panda-4821   # Resume existing agent
-#   ./scripts/spawn-agent.sh --admin            # New agent in admin mode
-#   ./scripts/spawn-agent.sh --admin brave-panda  # Resume in admin mode
 #   ./scripts/spawn-agent.sh --list             # List all agents
 #   ./scripts/spawn-agent.sh --rm brave-panda   # Remove an agent
 #
-# Admin mode:
-#   - Writable filesystem (can install packages, skills)
-#   - 1GB memory (vs 512MB default)
-#   - No read-only restriction
-#   - Same network access and tracing
+# Agent mode (admin vs standard) is read from ~/.commandclaw/agents.json.
+# No --admin flag — the gateway's agents.json is the single source of truth.
 #
 # The agent runs inside a Docker container with:
 #   - /workspace mounted from ~/.commandclaw/workspaces/<agent-id>/
@@ -27,14 +22,13 @@ IMAGE="${COMMANDCLAW_IMAGE:-commandclaw:latest}"
 VAULT_TEMPLATE="${COMMANDCLAW_VAULT_TEMPLATE:-/apps/commandclaw-vault}"
 WORKSPACES_DIR="${HOME}/.commandclaw/workspaces"
 ENV_FILE="${COMMANDCLAW_ENV_FILE:-/apps/commandclaw/.env}"
+AGENTS_JSON="${COMMANDCLAW_AGENTS_JSON:-${HOME}/.commandclaw/agents.json}"
 MCP_NETWORK="${COMMANDCLAW_MCP_NETWORK:-commandclaw-mcp_default}"
 OBSERVE_NETWORK="${COMMANDCLAW_OBSERVE_NETWORK:-commandclaw-observe_default}"
 
 # --- Word lists (matching workspace.py and chakravarti-cli) ---
 ADJECTIVES=(bold brave calm cool crisp deft fair fast fine firm fond free glad gold good keen kind lean live neat nice pure rare rich safe sage slim soft sure tall tidy true vast warm wide wild wise zany epic swift)
 ANIMALS=(ape bat bear bison boar bull civet cobra crane crow deer dove eagle fox frog gaur gecko goat hawk hare heron ibis jackal kite koel langur lion moth mongoose myna newt otter owl panda peacock rat rhino robin shrew stork tiger viper wolf)
-
-ADMIN_MODE=false
 
 generate_agent_id() {
     local hash adj_idx animal_idx suffix
@@ -44,6 +38,28 @@ generate_agent_id() {
     animal_idx=$(( 16#${hash:4:4} % ${#ANIMALS[@]} ))
     suffix=$(( 16#${hash:8:4} % 10000 ))
     printf '%s-%s-%04d' "${ADJECTIVES[$adj_idx]}" "${ANIMALS[$animal_idx]}" "$suffix"
+}
+
+get_agent_mode() {
+    # Read mode from agents.json. Falls back: agent entry → "default" entry → "standard".
+    local agent_id="$1"
+
+    if [ ! -f "$AGENTS_JSON" ]; then
+        echo "standard"
+        return
+    fi
+
+    # Try the specific agent first, then the "default" entry
+    local mode
+    mode=$(python3 -c "
+import json, sys
+with open('${AGENTS_JSON}') as f:
+    data = json.load(f)
+entry = data.get('${agent_id}') or data.get('default') or {}
+print(entry.get('mode', 'standard'))
+" 2>/dev/null || echo "standard")
+
+    echo "$mode"
 }
 
 ensure_workspace_dir() {
@@ -75,7 +91,9 @@ list_agents() {
         elif docker ps -aq --filter "name=cclaw-${name}" 2>/dev/null | grep -q .; then
             container_status="stopped"
         fi
-        printf "  %-30s %s\n" "$name" "($container_status)"
+        local mode
+        mode=$(get_agent_mode "$name")
+        printf "  %-30s %-10s %s\n" "$name" "($mode)" "($container_status)"
     done
 }
 
@@ -133,6 +151,10 @@ spawn_container() {
         exit 1
     fi
 
+    # Read agent mode from agents.json (single source of truth)
+    local agent_mode
+    agent_mode=$(get_agent_mode "$agent_id")
+
     # Extract OPENAI_API_KEY from env file for NeMo guardrails
     local openai_key
     openai_key=$(grep -E '^COMMANDCLAW_OPENAI_API_KEY=' "$ENV_FILE" | cut -d= -f2-)
@@ -159,8 +181,8 @@ spawn_container() {
         --restart "${restart_policy}"
     )
 
-    if [ "$ADMIN_MODE" = true ]; then
-        echo "  Mode: ADMIN (writable fs, 1GB memory)"
+    if [ "$agent_mode" = "admin" ]; then
+        echo "  Mode: ADMIN (writable fs, 1GB memory) — from agents.json"
         create_args+=(
             --memory 1g
             --cpus 2
@@ -206,29 +228,28 @@ case "${1:-}" in
         remove_agent "$2"
         ;;
     --admin|-a)
-        ADMIN_MODE=true
-        if [ -n "${2:-}" ]; then
-            # Explicit agent ID in admin mode
-            AGENT_ID="$2"
-        else
-            # Generate new agent in admin mode
-            AGENT_ID=$(generate_agent_id)
-        fi
-        ensure_workspace_dir "$AGENT_ID"
-        spawn_container "$AGENT_ID"
+        echo "The --admin flag has been removed." >&2
+        echo "Agent mode is now read from agents.json (single source of truth)." >&2
+        echo "" >&2
+        echo "To make an agent admin, edit: ${AGENTS_JSON}" >&2
+        echo '  e.g. "my-agent": {"roles": ["developer"], "tools": ["clock"], "mode": "admin"}' >&2
+        exit 1
         ;;
     --help|-h)
         echo "Usage:"
         echo "  $0                        Spawn new agent (auto-generated ID)"
         echo "  $0 <agent-id>             Resume or create agent with specific ID"
-        echo "  $0 --admin [agent-id]     Spawn/resume in admin mode (writable fs, can install packages)"
         echo "  $0 --list                 List all agents and their status"
         echo "  $0 --rm <agent-id>        Remove an agent (container + workspace)"
+        echo ""
+        echo "Agent mode (admin/standard) is read from agents.json — no flag needed."
+        echo "Edit ${AGENTS_JSON} to change an agent's mode."
         echo ""
         echo "Environment:"
         echo "  COMMANDCLAW_IMAGE          Docker image (default: commandclaw:latest)"
         echo "  COMMANDCLAW_VAULT_TEMPLATE Vault template path (default: /apps/commandclaw-vault)"
         echo "  COMMANDCLAW_ENV_FILE       Path to .env file (default: /apps/commandclaw/.env)"
+        echo "  COMMANDCLAW_AGENTS_JSON    Path to agents.json (default: ~/.commandclaw/agents.json)"
         echo "  COMMANDCLAW_MCP_NETWORK    Docker network for MCP gateway (default: commandclaw-mcp_default)"
         ;;
     "")
