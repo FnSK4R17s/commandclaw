@@ -1,0 +1,105 @@
+# branding.yml — CommandClaw ecosystem logo definitions
+#
+# Single source of truth for every logo in the CommandClaw family.
+# Read by the brand-kit skill:
+#   https://github.com/FnSK4R17s/datascience-skills-factory/tree/main/skills/brand-kit
+#
+# Sibling repos live adjacent on disk under /apps/ — the skill composes
+# each sibling's logo.png using the shared ⚓🦞 base mark plus a
+# scope-specific suffix emoji. See guiding_docs/LOGO_CONVENTIONS.md
+# for the human-facing reference table.
+
+# ── Brand identity ───────────────────────────────────────────────
+
+brand:
+  name: "CommandClaw"
+  tagline: "Git-native agent platform built for enterprise reliability and control."
+  source: fluent-3d
+
+# ── Base mark ────────────────────────────────────────────────────
+# The CommandClaw signature — appears in every repo logo.
+
+base_mark:
+  - emoji: "⚓"
+    name: Anchor
+    role: "Stability, control — anchored to the vault"
+  - emoji: "🦞"
+    name: Lobster
+    role: "The Claw — core brand identity"
+
+# ── Display sizes ────────────────────────────────────────────────
+
+display:
+  base_only:
+    height: 97       # 2-emoji core (commandclaw root)
+  with_suffix:
+    height: 88       # 3-emoji sibling/skill/subrepo logos
+  repo_level:
+    height: 97
+
+# ── Generation defaults ─────────────────────────────────────────
+
+defaults:
+  pixel_height: 168
+  gap: 8
+  background: transparent
+
+# ── Repo-level logo (this repo: commandclaw) ─────────────────────
+# CommandClaw core uses the base mark alone — no suffix.
+
+repo:
+  emojis: ["⚓", "🦞"]
+  output: logo.png
+
+# ── Sub-repos ────────────────────────────────────────────────────
+# None — CommandClaw has no nested child repos.
+
+subrepos_base_path: "."
+subrepos: {}
+
+# ── Sibling repos ────────────────────────────────────────────────
+# Parallel repos under /apps/ that share the CommandClaw brand.
+# Output: ../<key>/logo.png relative to this branding.yml.
+
+siblings_base_path: ".."
+
+siblings:
+  commandclaw-vault:
+    suffix: ["🏠"]
+    name: "House"
+    reason: "Vault = home, where the agent lives"
+
+  commandclaw-mcp:
+    suffix: ["🔐"]
+    name: "Locked with key"
+    reason: "Security gateway, credential isolation"
+
+  commandclaw-skills:
+    suffix: ["💪"]
+    name: "Flexed biceps"
+    reason: "Skills = capabilities, strength"
+
+  commandclaw-observe:
+    suffix: ["🔭"]
+    name: "Telescope"
+    reason: "Observability, looking into agent runs"
+
+  commandclaw-wiki:
+    suffix: ["📚"]
+    name: "Books"
+    reason: "The shared library — stacked pages of accumulated knowledge"
+
+  commandclaw-memory:
+    suffix: ["🧠"]
+    name: "Brain"
+    reason: "The recall machinery — distillation, retrieval, remembering"
+
+  commandclaw-gateway:
+    suffix: ["🚪"]
+    name: "Door"
+    reason: "The LLM routing layer — virtual keys, provider routing, cost governance"
+
+# ── Skills ───────────────────────────────────────────────────────
+# No skills/ directory in the commandclaw repo yet.
+
+skills: {}
