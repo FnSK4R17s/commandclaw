@@ -20,7 +20,7 @@ It is a ground-up redesign of [openclaw](openclaw.md) with enterprise controls b
 | **Isolation** | Each agent runs in its own Docker container: 512MB RAM, 1 CPU, read-only root, tmpfs for scratch, vault bind-mounted at `/workspace`. |
 | **Agent naming** | `adjective-animal-NNNN` (chakravarti-cli convention) — stable, memorable, greppable. |
 | **Memory** | Daily notes and long-term MEMORY.md, auto-committed to the vault on every write. |
-| **Guardrails** | Presidio (PII detection + redaction), NeMo Guardrails config, bashlex command linting, detect-secrets. |
+| **Guardrails** | Presidio (PII detection + redaction), NeMo Guardrails config, regex-based command linting, detect-secrets. |
 | **Tracing** | Full Langfuse integration — LLM calls, tool calls, graph state transitions. |
 
 ## Tech stack and why
@@ -50,7 +50,7 @@ src/commandclaw/
 │   ├── retry.py          Retry policy for tool failures and transient LLM errors
 │   ├── runtime.py        Agent boot, lifecycle, vault resolution
 │   └── tools/
-│       ├── bash_tool.py      bashlex-linted shell execution
+│       ├── bash_tool.py      regex-linted shell execution
 │       ├── file_read.py      Read a file in the vault
 │       ├── file_write.py     Write + auto-commit
 │       ├── file_list.py      List files and dirs

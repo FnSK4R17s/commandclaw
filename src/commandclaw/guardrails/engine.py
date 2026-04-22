@@ -1,6 +1,6 @@
 """CommandClaw guardrails engine — NeMo Guardrails + custom bash blocking.
 
-Provides input/output rail checks via NeMo and bash command validation via bashlex.
+Provides input/output rail checks via NeMo and regex-based bash command validation.
 Falls back to regex-only checks if NeMo is unavailable.
 """
 
@@ -181,31 +181,12 @@ ADMIN_ALLOWED_PATTERNS = re.compile(
 def check_bash_command(command: str) -> str | None:
     """Check a bash command for dangerous patterns. Returns violation string or None.
 
-    Uses regex pre-filter + bashlex AST parsing for thorough analysis.
     In admin mode, package management commands are allowed.
     """
-    # In admin mode, allow package management commands
     if is_admin_mode() and ADMIN_ALLOWED_PATTERNS.search(command):
         return None
 
-    # Regex pre-filter
     if DANGEROUS_COMMANDS.search(command):
         return f"dangerous_command: {command[:80]}"
-
-    # AST-based check
-    try:
-        import bashlex
-
-        parts = bashlex.parse(command)
-        for part in parts:
-            if hasattr(part, "parts"):
-                for sub in part.parts:
-                    word = getattr(sub, "word", "")
-                    if word in ("sudo", "env", "xargs") and DANGEROUS_COMMANDS.search(command):
-                        return f"wrapper_bypass: {word} wrapping dangerous command"
-    except ImportError:
-        pass  # bashlex not available — regex already checked
-    except Exception:
-        pass  # Parse failure — allow (regex already checked)
 
     return None

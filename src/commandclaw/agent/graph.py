@@ -3,7 +3,7 @@
 Replaces the prompt-heavy runtime with code-structural behavior:
 - Pre-processing nodes for memory loading and session classification
 - NeMo Guardrails for input/output safety (jailbreak, PII, secrets)
-- bashlex AST-based command blocking for tool execution
+- Regex-based dangerous-command blocking for tool execution
 - Checkpointer for conversation history
 - ~50 token system prompt (identity only)
 """
