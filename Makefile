@@ -1,4 +1,4 @@
-.PHONY: build agent agent-admin agent-new agent-list agent-rm chat
+.PHONY: build agent agent-admin agent-new agent-list agent-rm chat test test-cov
 
 # Build the agent Docker image
 build:
@@ -29,3 +29,9 @@ agent-rm:
 # Quick chat using docker-compose (uses ./vault/ directory)
 chat:
 	docker compose run --rm agent chat
+
+test:
+	./.venv/bin/pytest
+
+test-cov:
+	./.venv/bin/pytest --cov=commandclaw --cov-report=term-missing

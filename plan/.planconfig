@@ -1,0 +1,23 @@
+# plan-feature config — honored by the skill on every invocation.
+# See ~/.claude/skills/plan-feature/SKILL.md for semantics.
+
+search:
+  # Stage 1 Research — run qmd against the repo's knowledge collection.
+  qmd_stage1: true
+  # Stage 3 Deep Research — qmd again for open-question resolution.
+  qmd_stage3: true
+  # qmd collection name. `auto` to let the skill detect; a string to pin.
+  # Pinned to the personal wiki — research stages surface any relevant prior
+  # thinking from there. We do not index the commandclaw repo itself.
+  qmd_collection: shikhar-wiki
+  # Stage 3 Deep Research — allow WebFetch for library docs / RFCs / APIs.
+  web_fetch_stage3: true
+  # Grep/Glob/Read scans of the codebase during Stage 1 and Stage 3.
+  codebase_search: true
+
+format:
+  # Slug style for new feature directories.
+  slug_case: kebab
+  # Status column style in plan/PLAN.md. `freeform` allows arbitrary labels;
+  # `enum` restricts to draft / v1-ready / v1-done / archived.
+  status: freeform

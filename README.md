@@ -158,6 +158,15 @@ npx skills add FnSK4R17s/commandclaw-skills
 
 Skills are managed by administrators, not agents. Agents can read and use skills but cannot install, update, or remove them.
 
+## Testing
+
+```bash
+make test          # full suite
+make test-cov      # with coverage
+```
+
+See [TEST.md](TEST.md) for setup, configuration, writing new tests, and the TDD workflow.
+
 ## Migrating from OpenClaw
 
 ```bash

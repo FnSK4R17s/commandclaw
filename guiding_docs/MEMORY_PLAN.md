@@ -1,4 +1,4 @@
-# PLAN.md — Memory Layer Implementation
+# MEMORY_PLAN.md — Memory Layer Implementation
 
 **Status:** DRAFT — awaiting signoff before implementation begins.
 **Date:** 2026-04-07 (revision 2 — wiki split into its own repo)
