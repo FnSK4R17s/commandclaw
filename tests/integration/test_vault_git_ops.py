@@ -10,6 +10,9 @@ from git import Repo
 from commandclaw.vault.git_ops import VaultRepo
 
 
+pytestmark = pytest.mark.integration
+
+
 @pytest.fixture()
 def git_repo(tmp_path: Path) -> VaultRepo:
     """Create a real git repo with an initial commit so HEAD exists."""

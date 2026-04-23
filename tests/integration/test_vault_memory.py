@@ -17,6 +17,9 @@ from commandclaw.vault.memory import (
 )
 
 
+pytestmark = pytest.mark.integration
+
+
 @pytest.fixture()
 def vault(tmp_path: Path) -> tuple[Path, VaultRepo]:
     """A vault path backed by a real git repo with an initial commit."""

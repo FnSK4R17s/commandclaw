@@ -28,6 +28,7 @@ from langchain.agents.middleware import (
     before_model,
     dynamic_prompt,
 )
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -232,13 +233,16 @@ async def _maybe_load_mcp_tools(settings: Settings) -> tuple[list[Any], Any]:
 async def build_agent_graph(
     settings: Settings,
     checkpointer: BaseCheckpointSaver | None = None,
+    *,
+    model: BaseChatModel | None = None,
 ) -> tuple[Any, Any]:
     """Build the CommandClaw agent. Returns `(agent, mcp_client_or_None)`.
 
     The caller owns the checkpointer's lifecycle (open at startup, close at
     shutdown). MCP client is returned so the caller can `disconnect()` it.
+    Pass ``model`` to inject a fake LLM (e.g. ``GenericFakeChatModel``) in tests.
     """
-    llm = _build_llm(settings)
+    llm = model if model is not None else _build_llm(settings)
     tools = _build_native_tools(settings)
 
     mcp_tools, mcp_client = await _maybe_load_mcp_tools(settings)

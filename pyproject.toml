@@ -55,3 +55,9 @@ select = ["E", "F", "I", "N", "W", "UP"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-ra --strict-markers --strict-config"
+markers = [
+    "integration: touches real disk, git, or sqlite — slower than unit",
+    "agent: end-to-end agent graph with a fake LLM — deterministic",
+    "e2e: hits a real LLM API and Langfuse — opt-in, requires keys",
+    "mcp: needs a running MCP gateway",
+]

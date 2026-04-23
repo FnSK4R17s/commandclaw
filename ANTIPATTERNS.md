@@ -23,6 +23,14 @@ and ordering correct.
 
 <!-- New entries go below this line, newest first. -->
 
+## 2026-04-23 — Regex `rm\s+-[a-zA-Z]*r` silently allowed `rm -rf`
+
+**What went wrong:** The dangerous-command guardrail regex required the flag block to *end* in `r`, so it caught `rm -r` and `rm -fr` but missed the most common form `rm -rf`. No tests existed, so the hole shipped.
+
+**Correct approach:** Use `rm\s+-[a-zA-Z]*r[a-zA-Z]*` — match any flag block that *contains* `r`. More importantly, every regex in `guardrails/engine.py` ships under a parametrized unit test. Adding a pattern means adding a `pytest.mark.parametrize` row in [tests/unit/test_guardrails_engine.py](tests/unit/test_guardrails_engine.py) — both positive and negative cases.
+
+**Context:** [src/commandclaw/guardrails/engine.py:96](src/commandclaw/guardrails/engine.py#L96)
+
 ## 2026-04-23 — Smuggling runtime context through `TypedDict` state with `_` prefix
 
 **What went wrong:** `state.get("_vault_path")` and `state.get("_api_key")` in `agent/graph.py` nodes. Underscore prefix signaled "internal" but values still flow through checkpointer serialization, leak into traces, and pollute the state schema. A `CommandClawContext` dataclass was defined alongside but never wired up.

@@ -12,6 +12,9 @@ from commandclaw.vault.recovery import check_vault_health, recover_vault
 from commandclaw.vault.skills import Skill, discover_skills, load_skill
 
 
+pytestmark = pytest.mark.integration
+
+
 def _make_skill(vault_path: Path, name: str, desc: str, body: str) -> Path:
     """Helper: create .agents/skills/<name>/SKILL.md with YAML frontmatter."""
     skill_dir = vault_path / ".agents" / "skills" / name

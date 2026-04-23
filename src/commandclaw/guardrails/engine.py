@@ -94,7 +94,7 @@ PII_PATTERNS = [
 ]
 
 DANGEROUS_COMMANDS = re.compile(
-    r"\b(rm\s+-[a-zA-Z]*r|mkfs|dd\s+.*of=/dev|fdisk|parted|"
+    r"\b(rm\s+-[a-zA-Z]*r[a-zA-Z]*|mkfs|dd\s+.*of=/dev|fdisk|parted|"
     r"curl\s+.*\|\s*(ba)?sh|wget\s+.*\|\s*(ba)?sh|"
     r">\s*/dev/sd|chmod\s+777|chown\s+-R\s+root)\b",
     re.IGNORECASE,
