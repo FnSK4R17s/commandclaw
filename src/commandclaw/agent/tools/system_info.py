@@ -13,7 +13,7 @@ def create_system_info_tool():
 
     @tool
     async def system_info() -> str:
-        """Check whether you are running in admin or standard mode, along with your current runtime capabilities: available commands, resource limits, and environment. Queries the MCP gateway for policy-driven capabilities when available."""
+        """Check whether you are running in admin or standard mode, along with your current runtime capabilities: available commands, resource limits, and environment. Queries the MCP gateway for policy-driven capabilities when available."""  # noqa: E501 — LLM-facing tool description
         admin = os.environ.get("COMMANDCLAW_ADMIN_MODE") == "1"
         agent_id = os.environ.get("COMMANDCLAW_AGENT_ID", "unknown")
         gateway_url = os.environ.get("COMMANDCLAW_MCP_GATEWAY_URL", "")
@@ -27,7 +27,11 @@ def create_system_info_tool():
                 f"Mode: {gateway_caps.get('mode', 'standard').upper()}",
                 f"Roles: {', '.join(gateway_caps.get('roles', []))}",
                 f"Allowed tool servers: {', '.join(gateway_caps.get('allowed_tools', []))}",
-                f"Rate limit: {gateway_caps.get('rate_limit', {}).get('requests_per_minute', 'unlimited')} req/min",
+                (
+                    "Rate limit: "
+                    f"{gateway_caps.get('rate_limit', {}).get('requests_per_minute', 'unlimited')}"
+                    " req/min"
+                ),
             ]
         else:
             lines.append(f"Mode: {'ADMIN' if admin else 'STANDARD'}")

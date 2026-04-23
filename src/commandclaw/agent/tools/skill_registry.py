@@ -41,7 +41,7 @@ def create_browse_skills_tool() -> BaseTool:
 
     @tool
     def browse_skills() -> str:
-        """Browse the official CommandClaw skills registry. Shows all available skills with descriptions that can be installed."""
+        """Browse the official CommandClaw skills registry. Shows all available skills with descriptions that can be installed."""  # noqa: E501 — LLM-facing tool description
         registry = _ensure_registry_cache()
         if registry is None or not registry.exists():
             return "Error: could not fetch the skills registry from GitHub."
@@ -68,10 +68,12 @@ def create_browse_skills_tool() -> BaseTool:
         import os
         if os.environ.get("COMMANDCLAW_ADMIN_MODE") == "1":
             lines.append(
-                "\nNote (admin mode): You can also install skills interactively with dependency scanning using "
-                "Vercel's skills CLI:\n"
-                "  npx skills add FnSK4R17s/commandclaw-skills   (official CommandClaw skills)\n"
-                "  npx skills add <owner/repo>                    (any compatible skills repo)"
+                "\nNote (admin mode): You can also install skills interactively"
+                " with dependency scanning using Vercel's skills CLI:\n"
+                "  npx skills add FnSK4R17s/commandclaw-skills"
+                "   (official CommandClaw skills)\n"
+                "  npx skills add <owner/repo>"
+                "                    (any compatible skills repo)"
             )
 
         return "\n".join(lines)
@@ -84,7 +86,7 @@ def create_install_skill_tool(vault_path: Path) -> BaseTool:
 
     @tool
     def install_skill(skill_name: str) -> str:
-        """Install a skill from the official CommandClaw skills registry into your workspace. Use browse_skills() first to see what's available."""
+        """Install a skill from the official CommandClaw skills registry into your workspace. Use browse_skills() first to see what's available."""  # noqa: E501 — LLM-facing tool description
         registry = _ensure_registry_cache()
         if registry is None or not registry.exists():
             return "Error: could not fetch the skills registry."

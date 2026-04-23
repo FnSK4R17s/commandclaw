@@ -54,7 +54,12 @@ def main() -> None:
         settings.agent_id = agent_id
         log.info("Agent: %s", agent_id)
 
-    log.info("CommandClaw starting — mode=%s vault=%s model=%s", mode, settings.vault_path, settings.openai_model)
+    log.info(
+        "CommandClaw starting — mode=%s vault=%s model=%s",
+        mode,
+        settings.vault_path,
+        settings.openai_model,
+    )
 
     if mode in ("chat", "bootstrap"):
         asyncio.run(_chat_loop(settings))
@@ -88,7 +93,9 @@ def _collect_hatch_input(settings: Settings) -> tuple[HatchIdentity, str] | None
         while not name:
             name = input("  Name is required: ").strip()
         emoji = input("  Signature emoji (optional): ").strip()
-        creature = input("  Creature type — AI / robot / familiar / ghost / etc (optional): ").strip()
+        creature = input(
+            "  Creature type — AI / robot / familiar / ghost / etc (optional): "
+        ).strip()
         vibe = input("  Vibe — personality in a word or two (optional): ").strip()
 
         identity = HatchIdentity(name=name, emoji=emoji, creature=creature, vibe=vibe)

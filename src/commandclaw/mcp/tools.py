@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import Field, create_model
 
@@ -45,7 +45,7 @@ def _build_input_model(tool_def: MCPToolDef) -> type:
             )
         else:
             field_definitions[name] = (
-                Optional[py_type],
+                py_type | None,
                 Field(default=None, description=description),
             )
 
@@ -73,7 +73,7 @@ async def create_mcp_tools(client: MCPClient) -> list[Any]:
 
     tools: list[StructuredTool] = []
     for tool_def in tool_defs:
-        lc_tool = _wrap_tool(client, tool_def, StructuredTool)
+        lc_tool = _wrap_tool(client, tool_def, structured_tool_cls=StructuredTool)
         tools.append(lc_tool)
         log.debug("Registered LangChain tool: %s", lc_tool.name)
 
@@ -84,20 +84,18 @@ async def create_mcp_tools(client: MCPClient) -> list[Any]:
 def _wrap_tool(
     client: MCPClient,
     tool_def: MCPToolDef,
-    StructuredTool: type,
+    *,
+    structured_tool_cls: type,
 ) -> Any:
     """Create a single LangChain StructuredTool from an MCPToolDef."""
     input_model = _build_input_model(tool_def)
-    # Prefix with mcp_ to avoid name collisions with built-in tools.
     lc_name = f"mcp_{tool_def.name}"
-
-    # Capture tool_def.name in the closure (not the loop variable).
-    mcp_name = tool_def.name
+    mcp_name = tool_def.name  # capture in closure, not loop variable
 
     async def _invoke(**kwargs: Any) -> str:
         return await client.call_tool(mcp_name, kwargs)
 
-    return StructuredTool.from_function(
+    return structured_tool_cls.from_function(
         coroutine=_invoke,
         name=lc_name,
         description=tool_def.description,

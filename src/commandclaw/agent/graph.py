@@ -220,8 +220,8 @@ async def _maybe_load_mcp_tools(settings: Settings) -> tuple[list[Any], Any]:
         log.info("Loaded %d MCP tool(s) from gateway", len(tools))
         return tools, client
     except (
-        mcp_client_module.MCPGatewayUnavailable,
-        mcp_client_module.MCPAgentNotEnrolled,
+        mcp_client_module.MCPGatewayUnavailableError,
+        mcp_client_module.MCPAgentNotEnrolledError,
     ) as exc:
         log.warning("MCP unavailable — continuing without MCP tools: %s", exc)
         return [], None

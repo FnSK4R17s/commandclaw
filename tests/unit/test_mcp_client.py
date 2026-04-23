@@ -12,9 +12,9 @@ import httpx
 import pytest
 
 from commandclaw.mcp.client import (
-    MCPAgentNotEnrolled,
+    MCPAgentNotEnrolledError,
     MCPClient,
-    MCPGatewayUnavailable,
+    MCPGatewayUnavailableError,
     _extract_text,
     _parse_sse_response,
 )
@@ -68,7 +68,7 @@ async def test_bootstrap_session_raises_when_unenrolled() -> None:
         return httpx.Response(404, json={"error": "agent unknown"})
 
     client = _make_client_with_transport(handler)
-    with pytest.raises(MCPAgentNotEnrolled, match="agent unknown"):
+    with pytest.raises(MCPAgentNotEnrolledError, match="agent unknown"):
         await client._bootstrap_session()
     await client._http.aclose()
 
@@ -78,7 +78,7 @@ async def test_bootstrap_session_raises_when_unreachable() -> None:
         raise httpx.ConnectError("name resolution failed")
 
     client = _make_client_with_transport(handler)
-    with pytest.raises(MCPGatewayUnavailable, match="Cannot reach"):
+    with pytest.raises(MCPGatewayUnavailableError, match="Cannot reach"):
         await client._bootstrap_session()
     await client._http.aclose()
 
