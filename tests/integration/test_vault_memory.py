@@ -16,7 +16,6 @@ from commandclaw.vault.memory import (
     write_daily_note,
 )
 
-
 pytestmark = pytest.mark.integration
 
 

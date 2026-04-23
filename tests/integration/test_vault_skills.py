@@ -9,8 +9,7 @@ from git import Repo
 
 from commandclaw.vault.git_ops import VaultRepo
 from commandclaw.vault.recovery import check_vault_health, recover_vault
-from commandclaw.vault.skills import Skill, discover_skills, load_skill
-
+from commandclaw.vault.skills import discover_skills, load_skill
 
 pytestmark = pytest.mark.integration
 

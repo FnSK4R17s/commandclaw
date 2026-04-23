@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from git import GitCommandError, InvalidGitRepositoryError, Repo
+from git import InvalidGitRepositoryError, Repo
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +60,7 @@ class VaultRepo:
                     "message": c.message.strip(),
                     "author": str(c.author),
                     "timestamp": datetime.fromtimestamp(
-                        c.committed_date, tz=timezone.utc
+                        c.committed_date, tz=UTC
                     ).isoformat(),
                 }
             )

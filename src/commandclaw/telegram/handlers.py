@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import OrderedDict
 from collections.abc import Callable
 
 from telegram import Update
@@ -15,13 +16,23 @@ from commandclaw.telegram.sender import send_error_alert, send_message
 
 log = logging.getLogger(__name__)
 
-_chat_locks: dict[int, asyncio.Lock] = {}
+# LRU cap so a long-running bot can't accumulate one Lock per ever-seen chat.
+# A held lock is never evicted because it is currently the most-recently-used.
+_MAX_CHAT_LOCKS = 1024
+_chat_locks: OrderedDict[int, asyncio.Lock] = OrderedDict()
 
 
 def _lock_for(chat_id: int) -> asyncio.Lock:
-    if chat_id not in _chat_locks:
-        _chat_locks[chat_id] = asyncio.Lock()
-    return _chat_locks[chat_id]
+    """Return the lock for ``chat_id``, evicting the oldest if past the cap."""
+    lock = _chat_locks.get(chat_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _chat_locks[chat_id] = lock
+        while len(_chat_locks) > _MAX_CHAT_LOCKS:
+            _chat_locks.popitem(last=False)
+    else:
+        _chat_locks.move_to_end(chat_id)
+    return lock
 
 
 def create_message_handler(

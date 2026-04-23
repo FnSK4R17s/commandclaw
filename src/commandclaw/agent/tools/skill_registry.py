@@ -63,7 +63,7 @@ def create_browse_skills_tool() -> BaseTool:
         if len(lines) == 1:
             return "No skills found in the registry."
 
-        lines.append(f"\nTo install a skill, use: install_skill(\"<skill-name>\")")
+        lines.append("\nTo install a skill, use: install_skill(\"<skill-name>\")")
 
         import os
         if os.environ.get("COMMANDCLAW_ADMIN_MODE") == "1":

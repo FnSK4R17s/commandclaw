@@ -9,7 +9,6 @@ from git import Repo
 
 from commandclaw.vault.git_ops import VaultRepo
 
-
 pytestmark = pytest.mark.integration
 
 

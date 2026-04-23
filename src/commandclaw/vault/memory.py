@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from commandclaw.vault.git_ops import VaultRepo
@@ -43,7 +43,7 @@ def write_daily_note(vault_path: Path, entry: str, repo: VaultRepo) -> Path:
     today_str = date.today().isoformat()
     note_path = memory_dir / f"{today_str}.md"
 
-    timestamp = datetime.now(tz=timezone.utc).strftime("%H:%M UTC")
+    timestamp = datetime.now(tz=UTC).strftime("%H:%M UTC")
     line = f"\n- [{timestamp}] {entry}\n"
 
     with note_path.open("a", encoding="utf-8") as f:
@@ -62,7 +62,7 @@ def update_long_term_memory(
     memory_file = vault_path / "MEMORY.md"
     text = memory_file.read_text(encoding="utf-8") if memory_file.exists() else ""
 
-    timestamp = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
     new_line = f"\n- [{timestamp}] {entry}"
 
     header = f"## {section}"

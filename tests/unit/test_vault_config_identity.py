@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from commandclaw.vault.agent_config import AgentConfig, load_agent_config
 from commandclaw.vault.identity import (
     Identity,
