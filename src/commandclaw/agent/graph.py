@@ -1,145 +1,33 @@
-"""CommandClaw agent — `langchain.agents.create_agent` with middleware guardrails.
-
-Runtime context (vault path, agent identity, user/session IDs, API key) is passed
-via the agent's `context_schema` rather than smuggled through `TypedDict` state.
-Guardrails live as `@before_model` / `@after_model` middleware. Conversation
-history persists through `AsyncSqliteSaver` so restarts don't drop threads.
+"""CommandClaw agent — build and invoke the LangChain v1 agent graph.
 
 Public surface:
 
-* `CommandClawContext` — dataclass passed to every invocation
-* `build_agent_graph(settings, checkpointer)` — returns a compiled agent
-* `invoke_agent(agent, message, ...)` — wrapper returning `AgentResult`
+* ``build_agent_graph(settings, checkpointer)`` — returns a compiled agent
+* ``invoke_agent(agent, message, ...)`` — wrapper returning ``AgentResult``
+
+Data types live in ``context.py``; middleware lives in ``middleware.py``.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
-from langchain.agents import create_agent
-from langchain.agents.middleware import (
-    AgentState,
-    ModelRequest,
-    after_model,
-    before_model,
-    dynamic_prompt,
-)
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
+from commandclaw.agent.context import AgentResult, CommandClawContext
+from commandclaw.agent.middleware import (
+    input_guardrails,
+    output_guardrails,
+    vault_identity_prompt,
+)
 from commandclaw.config import Settings
 
 log = logging.getLogger(__name__)
-
-
-# ============================================================
-# Runtime context — passed via create_agent(context_schema=...)
-# ============================================================
-
-
-@dataclass
-class CommandClawContext:
-    """Per-invocation runtime context. Lives in `runtime.context`, not state."""
-
-    vault_path: str
-    agent_id: str
-    api_key: str | None = None
-    user_id: str | None = None
-    session_id: str | None = None
-
-
-@dataclass
-class AgentResult:
-    """Result from a single agent invocation."""
-
-    output: str
-    success: bool
-    error: str | None = None
-
-
-# ============================================================
-# Middleware — dynamic prompt + I/O guardrails
-# ============================================================
-
-
-@dynamic_prompt
-def vault_identity_prompt(request: ModelRequest) -> str:
-    """Assemble the system prompt from vault files for every model call."""
-    ctx: CommandClawContext = request.runtime.context
-    vault = Path(ctx.vault_path)
-
-    parts: list[str] = [f"Your agent ID is {ctx.agent_id}."]
-    for filename in ("IDENTITY.md", "AGENTS.md", "USER.md"):
-        p = vault / filename
-        if p.exists():
-            text = p.read_text(encoding="utf-8").strip()
-            if text:
-                parts.append(text)
-    parts.append(
-        "Use your tools to accomplish tasks. "
-        "Use file_read to access other vault files. "
-        "Use file_write or memory_write to persist important context."
-    )
-    return "\n\n".join(parts)
-
-
-_BLOCK_INPUT = (
-    "I can't process that — it may contain sensitive information. "
-    "Please rephrase your request."
-)
-_BLOCK_OUTPUT = (
-    "I drafted a response but it may contain sensitive information. "
-    "Please rephrase your request."
-)
-
-
-@before_model(can_jump_to=["end"])
-async def input_guardrails(state: AgentState, runtime: Any) -> dict[str, Any] | None:
-    """Block jailbreak / PII / secrets in the latest user message."""
-    from commandclaw.guardrails.engine import check_input
-
-    msgs = state.get("messages", [])
-    last = msgs[-1] if msgs else None
-    if not isinstance(last, HumanMessage):
-        return None
-
-    content = last.content if isinstance(last.content, str) else str(last.content)
-    ctx: CommandClawContext = runtime.context
-    violations = await check_input(content, api_key=ctx.api_key)
-
-    if violations:
-        log.warning("Input guardrail violations: %s", violations)
-        return {
-            "messages": [AIMessage(content=_BLOCK_INPUT)],
-            "jump_to": "end",
-        }
-    return None
-
-
-@after_model
-async def output_guardrails(state: AgentState, runtime: Any) -> dict[str, Any] | None:
-    """Replace AI output if it leaks secrets / PII."""
-    from commandclaw.guardrails.engine import check_output
-
-    msgs = state.get("messages", [])
-    last = msgs[-1] if msgs else None
-    if not isinstance(last, AIMessage) or not last.content:
-        return None
-
-    content = last.content if isinstance(last.content, str) else str(last.content)
-    ctx: CommandClawContext = runtime.context
-    violations = await check_output(content, api_key=ctx.api_key)
-
-    if violations:
-        log.warning("Output guardrail violations: %s", violations)
-        return {"messages": [AIMessage(content=_BLOCK_OUTPUT)]}
-    return None
 
 
 # ============================================================
@@ -236,12 +124,14 @@ async def build_agent_graph(
     *,
     model: BaseChatModel | None = None,
 ) -> tuple[Any, Any]:
-    """Build the CommandClaw agent. Returns `(agent, mcp_client_or_None)`.
+    """Build the CommandClaw agent. Returns ``(agent, mcp_client_or_None)``.
 
     The caller owns the checkpointer's lifecycle (open at startup, close at
-    shutdown). MCP client is returned so the caller can `disconnect()` it.
+    shutdown). MCP client is returned so the caller can ``disconnect()`` it.
     Pass ``model`` to inject a fake LLM (e.g. ``GenericFakeChatModel``) in tests.
     """
+    from langchain.agents import create_agent
+
     llm = model if model is not None else _build_llm(settings)
     tools = _build_native_tools(settings)
 
