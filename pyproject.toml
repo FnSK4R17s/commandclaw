@@ -39,7 +39,7 @@ dev = [
 ]
 
 [project.scripts]
-commandclaw = "commandclaw.__main__:main"
+commandclaw = "commandclaw.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/commandclaw"]
