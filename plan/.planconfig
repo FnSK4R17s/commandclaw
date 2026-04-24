@@ -1,0 +1,28 @@
+# plan-feature config for this repo.
+# Honored by the plan-feature skill on every invocation.
+
+search:
+  # Codebase scans via Grep/Glob/Read in Stage 1 and Stage 3.
+  codebase_search: true
+
+  # qmd hybrid search in Stage 1 Research.
+  qmd_stage1: true
+  # qmd hybrid search in Stage 3 Deep Research.
+  qmd_stage3: true
+  # Collection name. commandclaw has no dedicated qmd collection;
+  # fall back to the user's personal wiki for background/conceptual lookups.
+  qmd_collection: shikhar-wiki
+
+  # WebFetch in Stage 3 for library docs, RFCs, external APIs.
+  web_fetch_stage3: true
+
+format:
+  # Slug casing for feature directories.
+  slug_case: kebab
+  # Status column style in PLAN.md. `enum` restricts values.
+  status: enum
+  status_enum:
+    - draft
+    - v1-ready
+    - v1-done
+    - archived
