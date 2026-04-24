@@ -16,6 +16,8 @@ from commandclaw.vault.memory import (
     write_daily_note,
 )
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture()
 def vault(tmp_path: Path) -> tuple[Path, VaultRepo]:

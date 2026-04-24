@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from commandclaw.agent.tools.bash_tool import MAX_OUTPUT_LENGTH, create_bash_tool
+
+pytestmark = pytest.mark.integration
 
 
 def test_bash_runs_command_and_returns_output(tmp_path: Path) -> None:

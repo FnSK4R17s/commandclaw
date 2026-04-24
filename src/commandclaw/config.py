@@ -90,6 +90,19 @@ class Settings(BaseSettings):
         default=1.0,
         description="Base delay in seconds for exponential backoff.",
     )
+    max_output_tokens: int = Field(
+        default=16_384,
+        description="Cap on model max_tokens. Override per-deploy for large-context models.",
+    )
+
+    # --- Persistence ---
+    checkpoint_db: Path | None = Field(
+        default=None,
+        description=(
+            "SQLite path for the LangGraph checkpointer. "
+            "Defaults to <vault>/.commandclaw/checkpoints.db when None."
+        ),
+    )
 
     # --- Codex credential shortcut ---
     codex_home: Path = Field(

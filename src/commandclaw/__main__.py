@@ -54,18 +54,19 @@ def main() -> None:
         settings.agent_id = agent_id
         log.info("Agent: %s", agent_id)
 
-    log.info("CommandClaw starting — mode=%s vault=%s model=%s", mode, settings.vault_path, settings.openai_model)
+    log.info(
+        "CommandClaw starting — mode=%s vault=%s model=%s",
+        mode,
+        settings.vault_path,
+        settings.openai_model,
+    )
 
     if mode in ("chat", "bootstrap"):
         asyncio.run(_chat_loop(settings))
     else:
-        # Telegram mode still uses old runtime for now
-        from commandclaw.agent.runtime import create_agent
-
-        agent_executor, cleanup_fn = asyncio.run(create_agent(settings))
         from commandclaw.telegram.bot import start_bot
 
-        start_bot(agent_executor, settings, cleanup_fn)
+        start_bot(settings)
 
 
 class HatchIdentity(BaseModel):
@@ -92,7 +93,9 @@ def _collect_hatch_input(settings: Settings) -> tuple[HatchIdentity, str] | None
         while not name:
             name = input("  Name is required: ").strip()
         emoji = input("  Signature emoji (optional): ").strip()
-        creature = input("  Creature type — AI / robot / familiar / ghost / etc (optional): ").strip()
+        creature = input(
+            "  Creature type — AI / robot / familiar / ghost / etc (optional): "
+        ).strip()
         vibe = input("  Vibe — personality in a word or two (optional): ").strip()
 
         identity = HatchIdentity(name=name, emoji=emoji, creature=creature, vibe=vibe)
@@ -128,34 +131,23 @@ def _write_identity_file(vault_path: Path, identity: HatchIdentity) -> None:
 
 async def _chat_loop(settings: Settings) -> None:
     """Interactive REPL using the new agent graph."""
-    from langchain_core.messages import AIMessage, HumanMessage
-
-    from commandclaw.agent.graph import build_agent_graph
+    from commandclaw.agent.graph import build_agent_graph, invoke_agent
+    from commandclaw.agent.persistence import open_checkpointer
     from commandclaw.tracing.langfuse_tracing import flush_tracing
 
     log = logging.getLogger("commandclaw")
 
-    graph = build_agent_graph(settings)
-    thread_id = f"{settings.agent_id or 'default'}/cli"
+    saver, close_checkpointer = await open_checkpointer(settings)
+    agent, mcp_client = await build_agent_graph(settings, checkpointer=saver)
 
-    # Set Langfuse trace name to agent_id for all invocations in this session
-    try:
-        from langfuse import propagate_attributes
-        propagate_attributes(
-            trace_name=settings.agent_id or "commandclaw",
-            tags=["commandclaw"],
-        )
-    except Exception:
-        pass
-
-    # --- Hatch flow: BOOTSTRAP.md exists → prompt user, then bootstrap ---
     bootstrap_path = settings.vault_path / "BOOTSTRAP.md"
     hatching = bootstrap_path.exists()
 
     if hatching:
         hatch_result = _collect_hatch_input(settings)
         if hatch_result is None:
-            return  # user cancelled
+            await close_checkpointer()
+            return
         hatch_identity, hatch_intro = hatch_result
         _write_identity_file(settings.vault_path, hatch_identity)
     else:
@@ -163,7 +155,6 @@ async def _chat_loop(settings: Settings) -> None:
 
     try:
         while True:
-            # On first iteration during hatch, use collected input
             if hatching:
                 message = (
                     "You are booting up for the first time. "
@@ -186,35 +177,19 @@ async def _chat_loop(settings: Settings) -> None:
                     continue
                 message = user_input
 
-            try:
-                result = await graph.ainvoke(
-                    {
-                        "messages": [HumanMessage(content=message)],
-                        "session_type": "general",
-                        "trigger_source": "user",
-                        "user_id": "cli",
-                        "agent_id": settings.agent_id or "default",
-                        "memory_loaded": False,
-                        "vault_context": [],
-                        "guardrail_violations": [],
-                        "identity_prompt": "",
-                        "_vault_path": str(settings.vault_path),
-                    },
-                    config={"configurable": {"thread_id": thread_id}},
-                )
+            result = await invoke_agent(
+                agent,
+                message,
+                settings,
+                session_id="cli",
+                user_id="cli",
+            )
+            if result.success:
+                print(f"\nagent> {result.output}\n")
+            else:
+                log.error("Agent invocation failed: %s", result.error)
+                print(f"\n[error] {result.error}\n")
 
-                ai_messages = [
-                    m for m in result.get("messages", [])
-                    if isinstance(m, AIMessage) and m.content
-                ]
-                output = ai_messages[-1].content if ai_messages else "(no response)"
-                print(f"\nagent> {output}\n")
-
-            except Exception as exc:
-                log.exception("Agent invocation failed")
-                print(f"\n[error] {exc}\n")
-
-            # After hatch completes, switch to normal chat
             if hatching:
                 if not bootstrap_path.exists():
                     log.info("Bootstrap complete — BOOTSTRAP.md deleted by agent")
@@ -226,6 +201,12 @@ async def _chat_loop(settings: Settings) -> None:
     except KeyboardInterrupt:
         print("\n")
     finally:
+        if mcp_client is not None:
+            try:
+                await mcp_client.disconnect()
+            except Exception:
+                log.exception("Error disconnecting MCP client")
+        await close_checkpointer()
         flush_tracing()
         print("Goodbye.")
 

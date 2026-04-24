@@ -21,11 +21,11 @@ log = logging.getLogger(__name__)
 _TIMEOUT = 30.0
 
 
-class MCPGatewayUnavailable(ConnectionError):
+class MCPGatewayUnavailableError(ConnectionError):
     """MCP gateway is not reachable."""
 
 
-class MCPAgentNotEnrolled(PermissionError):
+class MCPAgentNotEnrolledError(PermissionError):
     """Agent is not enrolled in the MCP gateway."""
 
 # JSON-RPC headers for MCP protocol
@@ -193,13 +193,13 @@ class MCPClient:
         try:
             resp = await self._http.post(sessions_url, json={"agent_id": self.agent_id})
         except httpx.ConnectError as exc:
-            raise MCPGatewayUnavailable(
+            raise MCPGatewayUnavailableError(
                 f"Cannot reach MCP gateway at {sessions_url}: {exc}"
             ) from None
 
         if resp.status_code == 404:
             detail = resp.json().get("error", resp.text)
-            raise MCPAgentNotEnrolled(
+            raise MCPAgentNotEnrolledError(
                 f"Agent '{self.agent_id}' not enrolled in MCP gateway: {detail}"
             )
         resp.raise_for_status()
