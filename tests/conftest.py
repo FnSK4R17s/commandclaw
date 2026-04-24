@@ -89,11 +89,9 @@ def _disable_langfuse(monkeypatch: pytest.MonkeyPatch) -> None:
     """Force Langfuse keys empty so the tracing handler is a no-op."""
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "")
     monkeypatch.setenv("LANGFUSE_SECRET_KEY", "")
-    # Reset the singleton so prior test runs don't leak state.
-    import commandclaw.tracing.langfuse_tracing as lf
+    from commandclaw.tracing.langfuse_tracing import reset_default_manager
 
-    monkeypatch.setattr(lf, "_langfuse_client", None)
-    monkeypatch.setattr(lf, "_initialized", False)
+    reset_default_manager()
 
 
 # ============================================================
