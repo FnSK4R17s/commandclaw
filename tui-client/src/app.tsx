@@ -1,5 +1,9 @@
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/react"
 import { useCallback, useRef, useState } from "react"
+import { Mascot } from "./assets/mascot"
+import { CherryBranch } from "./assets/cherry-branch"
+import { Petals } from "./assets/petals"
+import { FujiScene } from "./assets/fuji-scene"
 import { streamChat, healthCheck } from "./sse-client"
 
 interface Message {
@@ -7,11 +11,12 @@ interface Message {
   content: string
 }
 
-const COLORS = {
-  bg: "#1a1b26",
+const C = {
+  bg: "#1a1b2e",
   headerBg: "#16161e",
-  inputBg: "#1f2335",
-  border: "#3b4261",
+  inputBg: "#1f2035",
+  inputBorder: "#e06080",
+  inputBorderDim: "#5a3050",
   accent: "#c0a0d0",
   userFg: "#7aa2f7",
   agentFg: "#9ece6a",
@@ -20,13 +25,10 @@ const COLORS = {
   errorFg: "#f7768e",
   statusBg: "#16161e",
   dimFg: "#565f89",
+  versionFg: "#e890ab",
+  titleFg: "#e0e0f0",
+  sakura: "#f7a8c4",
 }
-
-const LOGO = [
-  "  /\\_/\\  ",
-  " ( o.o ) ",
-  "  > ^ <  ",
-]
 
 export function App() {
   const renderer = useRenderer()
@@ -50,7 +52,7 @@ export function App() {
     } else {
       setMessages([{
         role: "system",
-        content: "Cannot reach CommandClaw server at localhost:8080. Start with: commandclaw serve",
+        content: "Cannot reach CommandClaw server. Start with: commandclaw serve",
       }])
     }
   }, [])
@@ -66,7 +68,6 @@ export function App() {
     setIsStreaming(true)
 
     let agentResponse = ""
-
     setMessages(prev => [...prev, { role: "agent", content: "" }])
 
     await streamChat(
@@ -81,9 +82,7 @@ export function App() {
             return updated
           })
         },
-        onDone: () => {
-          setIsStreaming(false)
-        },
+        onDone: () => { setIsStreaming(false) },
         onError: (error) => {
           setMessages(prev => [...prev, { role: "system", content: `Error: ${error}` }])
           setIsStreaming(false)
@@ -98,89 +97,88 @@ export function App() {
     }
   })
 
-  const headerHeight = 5
-  const statusHeight = 1
+  const headerHeight = 7
   const inputHeight = 3
-  const chatHeight = Math.max(height - headerHeight - statusHeight - inputHeight, 3)
+  const statusHeight = 2
 
   return (
-    <box
-      style={{
-        flexDirection: "column",
+    <box style={{ flexDirection: "column", width: "100%", height: "100%", backgroundColor: C.bg }}>
+
+      {/* === HEADER === */}
+      <box style={{
+        flexDirection: "row",
+        height: headerHeight,
         width: "100%",
-        height: "100%",
-        backgroundColor: COLORS.bg,
-      }}
-    >
-      {/* Header */}
-      <box
-        style={{
-          flexDirection: "row",
-          height: headerHeight,
-          width: "100%",
-          backgroundColor: COLORS.headerBg,
-          paddingLeft: 2,
-          paddingTop: 1,
-          gap: 2,
-        }}
-      >
-        <box style={{ flexDirection: "column", width: 10 }}>
-          {LOGO.map((line, i) => (
-            <text key={`logo-${i}`} fg={COLORS.accent}>{line}</text>
-          ))}
-        </box>
-        <box style={{ flexDirection: "column", paddingTop: 0 }}>
+        backgroundColor: C.headerBg,
+        paddingLeft: 2,
+        paddingTop: 1,
+      }}>
+        {/* Mascot */}
+        <Mascot />
+
+        {/* Title block */}
+        <box style={{ flexDirection: "column", paddingLeft: 2, paddingTop: 1 }}>
           <text>
-            <span fg={COLORS.textFg}><b>CommandClaw</b></span>
+            <span fg={C.titleFg}><b>CommandClaw</b></span>
             {"  "}
-            <span fg={COLORS.dimFg}>v0.1.0</span>
+            <span fg={C.versionFg}>v0.1.0</span>
+            {"  "}
+            <span fg={C.sakura}>{"✿"}</span>
           </text>
-          <text fg={COLORS.dimFg}>
+          <text fg={C.dimFg}>
             {agentId ? `agent: ${agentId}` : "connecting..."}
           </text>
         </box>
+
+        {/* Cherry branch — top right */}
+        <box style={{ position: "absolute", right: 0, top: 0 }}>
+          <CherryBranch />
+        </box>
       </box>
 
-      {/* Chat area */}
-      <scrollbox
-        style={{
-          flexGrow: 1,
-          height: chatHeight,
-          width: "100%",
-          paddingLeft: 2,
-          paddingRight: 2,
-          paddingTop: 1,
-        }}
-      >
-        {messages.map((msg, i) => (
-          <box key={`msg-${i}`} style={{ flexDirection: "row", width: "100%", paddingBottom: 1 }}>
-            <text fg={
-              msg.role === "user" ? COLORS.userFg
-                : msg.role === "agent" ? COLORS.agentFg
-                  : COLORS.systemFg
-            }>
-              {msg.role === "user" ? "you> " : msg.role === "agent" ? "agent> " : "[system] "}
-            </text>
-            <text fg={msg.role === "system" ? COLORS.systemFg : COLORS.textFg}>
-              {msg.content}
-              {msg.role === "agent" && isStreaming && i === messages.length - 1 ? "  " : ""}
-            </text>
-          </box>
-        ))}
-      </scrollbox>
+      {/* === CHAT AREA === */}
+      <box style={{ flexGrow: 1, width: "100%", position: "relative" }}>
+        {/* Falling petals overlay */}
+        <Petals width={width} height={height - headerHeight - inputHeight - statusHeight} />
 
-      {/* Input */}
-      <box
-        style={{
-          height: inputHeight,
+        {/* Messages */}
+        <scrollbox style={{
           width: "100%",
-          borderStyle: "rounded",
-          borderColor: isStreaming ? COLORS.dimFg : COLORS.accent,
-          paddingLeft: 1,
-          backgroundColor: COLORS.inputBg,
-        }}
-      >
-        <text fg={COLORS.accent}>{">"} </text>
+          height: "100%",
+          paddingLeft: 3,
+          paddingRight: 3,
+          paddingTop: 1,
+        }}>
+          {messages.map((msg, i) => (
+            <box key={`msg-${i}`} style={{ width: "100%", paddingBottom: 1 }}>
+              <text>
+                <span fg={
+                  msg.role === "user" ? C.userFg
+                    : msg.role === "agent" ? C.agentFg
+                      : C.systemFg
+                }>
+                  {msg.role === "user" ? "you> " : msg.role === "agent" ? "agent> " : "[system] "}
+                </span>
+                <span fg={msg.role === "system" ? C.systemFg : C.textFg}>
+                  {msg.content}
+                  {msg.role === "agent" && isStreaming && i === messages.length - 1 ? " ▊" : ""}
+                </span>
+              </text>
+            </box>
+          ))}
+        </scrollbox>
+      </box>
+
+      {/* === INPUT === */}
+      <box style={{
+        height: inputHeight,
+        width: "100%",
+        borderStyle: "rounded",
+        borderColor: isStreaming ? C.inputBorderDim : C.inputBorder,
+        paddingLeft: 1,
+        backgroundColor: C.inputBg,
+      }}>
+        <text fg={C.titleFg}><b>{">"}</b> </text>
         <input
           placeholder={isStreaming ? "Agent is responding..." : "Type a message..."}
           onInput={setInputValue}
@@ -190,29 +188,36 @@ export function App() {
         />
       </box>
 
-      {/* Status bar */}
-      <box
-        style={{
-          height: statusHeight,
-          width: "100%",
-          backgroundColor: COLORS.statusBg,
-          flexDirection: "row",
-          justifyContent: "space-between",
-          paddingLeft: 2,
-          paddingRight: 2,
-        }}
-      >
-        <text fg={COLORS.dimFg}>
+      {/* === STATUS BAR === */}
+      <box style={{
+        height: statusHeight,
+        width: "100%",
+        backgroundColor: C.statusBg,
+        borderStyle: "single",
+        borderColor: C.inputBorderDim,
+        flexDirection: "row",
+        justifyContent: "space-between",
+        paddingLeft: 2,
+        paddingRight: 2,
+        position: "relative",
+      }}>
+        <text fg={C.dimFg}>
           {connected
-            ? <span fg={COLORS.agentFg}>{"*"} connected</span>
-            : <span fg={COLORS.errorFg}>{"*"} disconnected</span>
+            ? <span fg={C.agentFg}>{"●"} connected</span>
+            : <span fg={C.errorFg}>{"●"} disconnected</span>
           }
-        </text>
-        <text fg={COLORS.dimFg}>
-          {isStreaming ? "streaming..." : "ready"}
           {"  "}
+          {isStreaming ? <span fg={C.sakura}>streaming...</span> : "ready"}
+        </text>
+
+        <text fg={C.dimFg}>
           ESC to quit
         </text>
+
+        {/* Fuji scene — bottom right */}
+        <box style={{ position: "absolute", right: 1, bottom: -7 }}>
+          <FujiScene />
+        </box>
       </box>
     </box>
   )
