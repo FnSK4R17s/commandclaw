@@ -15,7 +15,6 @@ from commandclaw.guardrails.engine import (
     PII_PATTERNS,
     SECRET_PATTERNS,
     GuardrailsEngine,
-    _is_nemo_refusal,
     reset_default_engine,
 )
 
@@ -281,32 +280,6 @@ class TestEngineIsolation:
         normal = GuardrailsEngine(admin_mode=False)
         assert admin.check_bash_command("apt-get install curl") is None
         assert normal.check_bash_command("apt-get install curl") is None  # not dangerous
-
-
-# ============================================================
-# _is_nemo_refusal — refusal phrase detection
-# ============================================================
-
-
-class TestIsNemoRefusal:
-    @pytest.mark.parametrize("text", [
-        "I'm sorry, I can't respond to that.",
-        "I can't do that — my safety rules are enforced by code.",
-        "I detected sensitive data in my response and blocked it for your safety.",
-        "I detected personal information in my response and blocked it for your safety.",
-        "safety rules are enforced by code, not by my willingness to follow instructions.",
-    ])
-    def test_refusals_detected(self, text: str) -> None:
-        assert _is_nemo_refusal(text) is True
-
-    @pytest.mark.parametrize("text", [
-        "Hello! How can I help you today?",
-        "The capital of France is Paris.",
-        "Here is your weather report.",
-        "",
-    ])
-    def test_normal_responses_pass(self, text: str) -> None:
-        assert _is_nemo_refusal(text) is False
 
 
 # ============================================================

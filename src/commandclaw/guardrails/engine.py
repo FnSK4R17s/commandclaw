@@ -52,20 +52,6 @@ ADMIN_ALLOWED_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
-_NEMO_REFUSAL_PHRASES = [
-    "i'm sorry, i can't respond to that",
-    "i can't do that",
-    "i detected sensitive data",
-    "i detected personal information",
-    "safety rules are enforced by code",
-]
-
-
-def _is_nemo_refusal(bot_content: str) -> bool:
-    """Return True if bot_content is a known NeMo refusal message."""
-    lowered = bot_content.strip().lower()
-    return any(phrase in lowered for phrase in _NEMO_REFUSAL_PHRASES)
-
 
 # ============================================================
 # GuardrailsEngine — testable, no global state
@@ -135,12 +121,13 @@ class GuardrailsEngine:
 
         if self._init_nemo(api_key):
             try:
-                response = await self._rails.generate_async(
-                    messages=[{"role": "user", "content": message}],
-                    options={"rails": ["input"]},
+                from nemoguardrails.rails.llm.options import RailStatus, RailType
+
+                result = await self._rails.check_async(
+                    [{"role": "user", "content": message}],
+                    rail_types=[RailType.INPUT],
                 )
-                bot_content = response.get("content", "")
-                if _is_nemo_refusal(bot_content):
+                if result.status == RailStatus.BLOCKED:
                     violations.append("nemo_input_rail_triggered")
                     return violations
             except Exception:
@@ -167,15 +154,16 @@ class GuardrailsEngine:
 
         if not violations and self._init_nemo(api_key):
             try:
-                response = await self._rails.generate_async(
-                    messages=[
+                from nemoguardrails.rails.llm.options import RailStatus, RailType
+
+                result = await self._rails.check_async(
+                    [
                         {"role": "user", "content": "Is this response safe?"},
                         {"role": "assistant", "content": message},
                     ],
-                    options={"rails": ["output"]},
+                    rail_types=[RailType.OUTPUT],
                 )
-                bot_content = response.get("content", "")
-                if _is_nemo_refusal(bot_content):
+                if result.status == RailStatus.BLOCKED:
                     violations.append("nemo_output_rail_triggered")
             except Exception:
                 log.debug("NeMo output check failed", exc_info=True)
