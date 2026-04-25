@@ -13,7 +13,7 @@ most-recently-touched first. Do not hand-edit unless you know why.
 
 | Feature | Research | Requirements | Deep Research | Backlog | Status |
 |---------|----------|--------------|---------------|---------|--------|
-| _(no features yet — invoke the skill to add one)_ | | | | | |
+| [message-queue](message-queue/) | [✅](message-queue/01-research.md) | [✅](message-queue/02-requirements.md) | [✅](message-queue/03-deep-research.md) | [✅](message-queue/04-backlog-item.md) | v1-ready |
 
 <!--
 Example row once features exist:
