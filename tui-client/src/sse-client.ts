@@ -1,4 +1,4 @@
-const DEFAULT_BASE_URL = "http://127.0.0.1:8080"
+const DEFAULT_BASE_URL = process.env.COMMANDCLAW_API_URL ?? "http://127.0.0.1:4269"
 
 export interface StreamCallbacks {
   onToken: (token: string) => void
