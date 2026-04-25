@@ -210,3 +210,134 @@ class TestChatLoopNormalMode:
         )
 
         assert any("Goodbye" in line for line in printed)
+
+
+# ============================================================
+# chat_loop — bootstrap (hatching) mode
+# ============================================================
+
+
+class TestChatLoopBootstrapMode:
+    @pytest.fixture
+    def bootstrap_settings(self, tmp_vault: Path, tmp_path: Path) -> Settings:
+        (tmp_vault / "BOOTSTRAP.md").write_text("# Bootstrap\nFollow these steps.\n")
+        return Settings(
+            vault_path=tmp_vault,
+            agent_id="hatch-agent",
+            openai_api_key="sk-test",
+            openai_model="gpt-test",
+            telegram_bot_token="tok",
+            checkpoint_db=tmp_path / "ck.db",
+            max_retries=0,
+            mcp_gateway_url=None,
+            langfuse_public_key=None,
+            langfuse_secret_key=None,
+        )
+
+    async def test_bootstrap_invokes_agent_with_bootstrap_message(
+        self, bootstrap_settings: Settings,
+    ) -> None:
+        from commandclaw.agent.context import AgentResult
+
+        close_ck = AsyncMock()
+        hatch_inputs = iter(["Claw", "", "", "", "I'm a dev", "exit"])
+        printed: list[str] = []
+        invoked_messages: list[str] = []
+
+        async def capture_invoke(agent, msg, settings, **kw):
+            invoked_messages.append(msg)
+            bootstrap_settings.vault_path.joinpath("BOOTSTRAP.md").unlink(missing_ok=True)
+            return AgentResult(output="Hatched!", success=True)
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr("commandclaw.agent.graph.invoke_agent", capture_invoke)
+            await chat_loop(
+                bootstrap_settings,
+                agent=AsyncMock(),
+                mcp_client=None,
+                close_checkpointer=close_ck,
+                input_fn=lambda _: next(hatch_inputs),
+                print_fn=lambda *a: printed.append(" ".join(str(x) for x in a)),
+            )
+
+        assert invoked_messages
+        assert "BOOTSTRAP.md" in invoked_messages[0]
+        assert "I'm a dev" in invoked_messages[0]
+
+    async def test_bootstrap_writes_identity_file(
+        self, bootstrap_settings: Settings,
+    ) -> None:
+        from commandclaw.agent.context import AgentResult
+
+        close_ck = AsyncMock()
+        hatch_inputs = iter(["TestBot", "!", "robot", "calm", "hi", "exit"])
+
+        async def fake_invoke(agent, msg, settings, **kw):
+            bootstrap_settings.vault_path.joinpath("BOOTSTRAP.md").unlink(missing_ok=True)
+            return AgentResult(output="Done", success=True)
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr("commandclaw.agent.graph.invoke_agent", fake_invoke)
+            await chat_loop(
+                bootstrap_settings,
+                agent=AsyncMock(),
+                mcp_client=None,
+                close_checkpointer=close_ck,
+                input_fn=lambda _: next(hatch_inputs),
+                print_fn=lambda *a: None,
+            )
+
+        identity = (bootstrap_settings.vault_path / "IDENTITY.md").read_text()
+        assert "**Name:** TestBot" in identity
+
+    async def test_bootstrap_cancelled_closes_checkpointer(
+        self, bootstrap_settings: Settings,
+    ) -> None:
+        close_ck = AsyncMock()
+
+        def raise_eof(_: str) -> str:
+            raise EOFError
+
+        await chat_loop(
+            bootstrap_settings,
+            agent=AsyncMock(),
+            mcp_client=None,
+            close_checkpointer=close_ck,
+            input_fn=raise_eof,
+            print_fn=lambda *a: None,
+        )
+
+        close_ck.assert_awaited_once()
+
+    async def test_bootstrap_then_normal_chat(
+        self, bootstrap_settings: Settings,
+    ) -> None:
+        from commandclaw.agent.context import AgentResult
+
+        close_ck = AsyncMock()
+        call_count = 0
+
+        hatch_inputs = iter(["Claw", "", "", "", "intro", "hello", "exit"])
+
+        async def fake_invoke(agent, msg, settings, **kw):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                bootstrap_settings.vault_path.joinpath("BOOTSTRAP.md").unlink(missing_ok=True)
+            return AgentResult(output=f"reply-{call_count}", success=True)
+
+        printed: list[str] = []
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr("commandclaw.agent.graph.invoke_agent", fake_invoke)
+            await chat_loop(
+                bootstrap_settings,
+                agent=AsyncMock(),
+                mcp_client=None,
+                close_checkpointer=close_ck,
+                input_fn=lambda _: next(hatch_inputs),
+                print_fn=lambda *a: printed.append(" ".join(str(x) for x in a)),
+            )
+
+        assert call_count == 2
+        assert any("reply-1" in line for line in printed)
+        assert any("reply-2" in line for line in printed)
