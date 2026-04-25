@@ -169,9 +169,13 @@ async def invoke_agent(
     *,
     session_id: str | None = None,
     user_id: str | None = None,
+    abort_event: asyncio.Event | None = None,
 ) -> AgentResult:
     """Invoke the agent on one message with retries + Langfuse tracing."""
     from commandclaw.tracing.langfuse_tracing import create_langfuse_handler
+
+    if abort_event is not None and abort_event.is_set():
+        raise asyncio.CancelledError
 
     context = CommandClawContext(
         vault_path=str(settings.vault_path),
@@ -189,12 +193,32 @@ async def invoke_agent(
 
     last_error: str | None = None
     for attempt in range(settings.max_retries + 1):
+        if abort_event is not None and abort_event.is_set():
+            raise asyncio.CancelledError
         try:
-            result = await agent.ainvoke(
-                {"messages": [HumanMessage(content=message)]},
-                config=config,
-                context=context,
+            task = asyncio.create_task(
+                agent.ainvoke(
+                    {"messages": [HumanMessage(content=message)]},
+                    config=config,
+                    context=context,
+                )
             )
+            if abort_event is not None:
+                abort_task = asyncio.create_task(abort_event.wait())
+                done, pending = await asyncio.wait(
+                    {task, abort_task}, return_when=asyncio.FIRST_COMPLETED
+                )
+                for p in pending:
+                    p.cancel()
+                    try:
+                        await p
+                    except asyncio.CancelledError:
+                        pass
+                if task not in done:
+                    raise asyncio.CancelledError
+                result = task.result()
+            else:
+                result = await task
             ai_msgs = [
                 m for m in result.get("messages", [])
                 if isinstance(m, AIMessage) and m.content

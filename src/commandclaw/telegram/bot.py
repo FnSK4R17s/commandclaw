@@ -82,6 +82,83 @@ async def _post_shutdown(application: Application) -> None:
         log.exception("Error flushing Langfuse")
 
 
+async def _stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /stop — abort the current session's queue."""
+    if update.effective_chat is None:
+        return
+    chat_id = update.effective_chat.id
+    session_id = str(chat_id)
+    dispatcher = context.application.bot_data.get("dispatcher")
+    if dispatcher is None:
+        return
+    count = await dispatcher.abort(session_id)
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"Agent stopped. {count} messages moved to discard queue.",
+    )
+
+
+async def _discarded_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /discarded — list discarded messages."""
+    if update.effective_chat is None:
+        return
+    chat_id = update.effective_chat.id
+    session_id = str(chat_id)
+    dispatcher = context.application.bot_data.get("dispatcher")
+    if dispatcher is None:
+        return
+    dq = dispatcher.get_discard_queue(session_id)
+    items = dq.list_discarded()
+    if not items:
+        await context.bot.send_message(chat_id=chat_id, text="No discarded messages.")
+        return
+    lines = []
+    for i, env in enumerate(items, start=1):
+        lines.append(f"{i}. {env.content}")
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text="Discarded messages:\n" + "\n".join(lines) + "\n\n/recover <n> or /recover all",
+    )
+
+
+async def _recover_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /recover <n> or /recover all — re-enqueue discarded messages."""
+    if update.effective_chat is None:
+        return
+    chat_id = update.effective_chat.id
+    session_id = str(chat_id)
+    dispatcher = context.application.bot_data.get("dispatcher")
+    if dispatcher is None:
+        return
+    dq = dispatcher.get_discard_queue(session_id)
+    args = context.args or []
+    if not args:
+        await context.bot.send_message(chat_id=chat_id, text="Usage: /recover <n> or /recover all")
+        return
+    if args[0].lower() == "all":
+        recovered = dq.recover_all()
+        for env in recovered:
+            await dispatcher.dispatch(env)
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"Recovered {len(recovered)} messages.",
+        )
+    else:
+        try:
+            user_index = int(args[0])  # 1-indexed from user
+        except ValueError:
+            await context.bot.send_message(
+                chat_id=chat_id, text="Usage: /recover <n> or /recover all"
+            )
+            return
+        env = dq.recover(user_index - 1)  # 0-indexed internally
+        await dispatcher.dispatch(env)
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"Recovered message: {env.content}",
+        )
+
+
 def start_bot(settings: Settings) -> None:
     """Build the Telegram application and start polling. Blocking."""
     app = (
@@ -94,6 +171,9 @@ def start_bot(settings: Settings) -> None:
 
     app.bot_data[_BOT_DATA_SETTINGS] = settings
     app.add_handler(CommandHandler("start", _start_command))
+    app.add_handler(CommandHandler("stop", _stop_command))
+    app.add_handler(CommandHandler("discarded", _discarded_command))
+    app.add_handler(CommandHandler("recover", _recover_command))
 
     log.info("Starting Telegram polling…")
     app.run_polling(drop_pending_updates=True)

@@ -341,3 +341,80 @@ class TestChatLoopBootstrapMode:
         assert call_count == 2
         assert any("reply-1" in line for line in printed)
         assert any("reply-2" in line for line in printed)
+
+
+# ============================================================
+# chat_loop — slash commands (/stop, /discarded)
+# ============================================================
+
+
+class TestChatLoopStopCommand:
+    @pytest.fixture
+    def chat_settings(self, tmp_vault: Path, tmp_path: Path) -> Settings:
+        return Settings(
+            vault_path=tmp_vault,
+            agent_id="test-agent",
+            openai_api_key="sk-test",
+            openai_model="gpt-test",
+            telegram_bot_token="tok",
+            checkpoint_db=tmp_path / "ck.db",
+            max_retries=0,
+            mcp_gateway_url=None,
+            langfuse_public_key=None,
+            langfuse_secret_key=None,
+        )
+
+    async def test_stop_command_not_sent_to_agent(self, chat_settings: Settings) -> None:
+        """Typing /stop should be handled as a special command — invoke_agent must not be called."""
+        invoke_mock = AsyncMock()
+        close_ck = AsyncMock()
+        inputs = iter(["/stop", "exit"])
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr("commandclaw.agent.graph.invoke_agent", invoke_mock)
+            await chat_loop(
+                chat_settings,
+                agent=AsyncMock(),
+                mcp_client=None,
+                close_checkpointer=close_ck,
+                input_fn=lambda _: next(inputs),
+                print_fn=lambda *a: None,
+            )
+
+        invoke_mock.assert_not_called()
+
+
+class TestChatLoopDiscardedCommand:
+    @pytest.fixture
+    def chat_settings(self, tmp_vault: Path, tmp_path: Path) -> Settings:
+        return Settings(
+            vault_path=tmp_vault,
+            agent_id="test-agent",
+            openai_api_key="sk-test",
+            openai_model="gpt-test",
+            telegram_bot_token="tok",
+            checkpoint_db=tmp_path / "ck.db",
+            max_retries=0,
+            mcp_gateway_url=None,
+            langfuse_public_key=None,
+            langfuse_secret_key=None,
+        )
+
+    async def test_discarded_command_not_sent_to_agent(self, chat_settings: Settings) -> None:
+        """Typing /discarded should be handled as a special command — invoke_agent must not be called."""
+        invoke_mock = AsyncMock()
+        close_ck = AsyncMock()
+        inputs = iter(["/discarded", "exit"])
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr("commandclaw.agent.graph.invoke_agent", invoke_mock)
+            await chat_loop(
+                chat_settings,
+                agent=AsyncMock(),
+                mcp_client=None,
+                close_checkpointer=close_ck,
+                input_fn=lambda _: next(inputs),
+                print_fn=lambda *a: None,
+            )
+
+        invoke_mock.assert_not_called()

@@ -71,6 +71,14 @@ async def chat_loop(
                     break
                 if not user_input.strip():
                     continue
+                # CLI slash commands — handled without agent invocation
+                stripped = user_input.strip().lower()
+                if stripped == "/stop":
+                    print_fn("\n[stop] No active queue in CLI mode.\n")
+                    continue
+                if stripped == "/discarded":
+                    print_fn("\n[discarded] No discarded messages.\n")
+                    continue
                 message = user_input
 
             result = await invoke_agent(

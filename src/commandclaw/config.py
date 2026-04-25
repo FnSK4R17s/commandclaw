@@ -80,6 +80,18 @@ class Settings(BaseSettings):
     langfuse_secret_key: str | None = Field(default=None)
     langfuse_host: str = Field(default="https://cloud.langfuse.com")
 
+    # --- Message Queue ---
+    queue_cap: int = Field(
+        default=200,
+        ge=1,
+        description="Max pending messages per session queue.",
+    )
+    discard_ttl_seconds: int = Field(
+        default=3600,
+        ge=0,
+        description="Seconds before discarded messages expire (default 1 hour).",
+    )
+
     # --- Execution ---
     bash_timeout: int = Field(
         default=120,
