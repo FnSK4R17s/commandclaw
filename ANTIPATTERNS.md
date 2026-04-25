@@ -23,6 +23,17 @@ and ordering correct.
 
 <!-- New entries go below this line, newest first. -->
 
+## 2026-04-25 — TDD skill skipped plan-feature reference files before slicing
+
+**What went wrong:** `/tdd implement plan/message-queue/04-backlog-item.md` was invoked. The agent read only the backlog item and the codebase, then proposed 10 TDD slices. It never read `01-research.md`, `02-requirements.md`, or `03-deep-research.md` — despite the backlog item's References section explicitly listing them under "The implementing agent should read these before starting." The deep-research file contained PTB-specific integration details: `block=False` on MessageHandler to enable concurrent `/stop` dispatch, `group=-1` on the `/stop` CommandHandler for priority, and the `_post_init` wiring that creates a Dispatcher with a `process_fn_factory` and stores it in `bot_data["dispatcher"]`. All three were missed in slicing, leaving the queue infrastructure disconnected from the PTB application lifecycle.
+
+**Correct approach:** When the TDD skill receives a backlog item (04-backlog-item.md) as input, read its References section and load all linked stage files (01-research, 02-requirements, 03-deep-research) before proposing slices. These files contain codebase context, acceptance criteria, resolved design questions, and integration details that the backlog item intentionally omits. Skipping them causes incomplete slicing. Derive behaviors-to-test from acceptance criteria in 02-requirements.md and cross-check against resolved questions in 03-deep-research.md.
+
+**Context:** `plan/message-queue/04-backlog-item.md` lines 143-148, `/tdd` skill SKILL.md Planning section
+
+---
+
+
 ## 2026-04-23 — Regex `rm\s+-[a-zA-Z]*r` silently allowed `rm -rf`
 
 **What went wrong:** The dangerous-command guardrail regex required the flag block to *end* in `r`, so it caught `rm -r` and `rm -fr` but missed the most common form `rm -rf`. No tests existed, so the hole shipped.
