@@ -25,6 +25,15 @@ Quick rules:
 - Markers are strict (`--strict-markers`). Register any new `@pytest.mark.foo` under `[tool.pytest.ini_options].markers` in [pyproject.toml](pyproject.toml) before using it.
 - TDD subagents `tdd-red`, `tdd-green`, `tdd-refactor` are installed under [.claude/agents/](.claude/agents/). Use them for one-test-at-a-time vertical slices.
 
+### E2e tests and `.env.test`
+
+E2e tests require **`.env.test`** (not `.env`). `.env` has Docker-internal hostnames (`gateway:8420`); `.env.test` has host-side URLs (`localhost:8420`) for running tests from the host machine. The `tests/e2e/conftest.py` loads `.env.test` automatically via `dotenv.load_dotenv()`.
+
+- **Run e2e:** `make test-e2e` (sources `.env.test`, runs `pytest -m e2e -v`).
+- **Run everything except e2e:** `make test-all`.
+- **MCP tests** are marked `@pytest.mark.mcp` and excluded by default — they require a running MCP gateway at `localhost:8420`. Run with `pytest -m mcp`.
+- **Never use `.env` for e2e tests.** It contains Docker-internal hostnames that won't resolve on the host.
+
 ## Anti-patterns
 
 Read [ANTIPATTERNS.md](ANTIPATTERNS.md) before starting non-trivial work in this
