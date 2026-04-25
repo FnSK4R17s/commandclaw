@@ -1,5 +1,5 @@
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/react"
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Mascot } from "./assets/mascot"
 import { CherryBranch } from "./assets/cherry-branch"
 import { Petals } from "./assets/petals"
@@ -57,8 +57,6 @@ export function App() {
     }
   }, [])
 
-  useState(() => { checkConnection() })
-
   const sendMessage = useCallback(async () => {
     const text = inputValue.trim()
     if (!text || isStreaming) return
@@ -97,76 +95,98 @@ export function App() {
     }
   })
 
-  const headerHeight = 7
+  const headerHeight = 8
   const inputHeight = 3
-  const statusHeight = 2
+  const statusHeight = 1
+  const mainHeight = Math.max(height - inputHeight - statusHeight, headerHeight + 4)
+  const chatHeight = Math.max(mainHeight - headerHeight - 2, 1)
+  const canvasWidth = Math.max(width - 2, 1)
+
+  useEffect(() => {
+    void checkConnection()
+  }, [checkConnection])
 
   return (
     <box style={{ flexDirection: "column", width: "100%", height: "100%", backgroundColor: C.bg }}>
 
-      {/* === HEADER === */}
+      {/* === MAIN CANVAS === */}
       <box style={{
-        flexDirection: "row",
-        height: headerHeight,
+        flexDirection: "column",
+        height: mainHeight,
         width: "100%",
-        backgroundColor: C.headerBg,
-        paddingLeft: 2,
-        paddingTop: 1,
+        borderStyle: "single",
+        borderColor: C.inputBorder,
+        backgroundColor: C.bg,
       }}>
-        {/* Mascot */}
-        <Mascot />
-
-        {/* Title block */}
-        <box style={{ flexDirection: "column", paddingLeft: 2, paddingTop: 1 }}>
-          <text>
-            <span fg={C.titleFg}><b>CommandClaw</b></span>
-            {"  "}
-            <span fg={C.versionFg}>v0.1.0</span>
-            {"  "}
-            <span fg={C.sakura}>{"✿"}</span>
-          </text>
-          <text fg={C.dimFg}>
-            {agentId ? `agent: ${agentId}` : "connecting..."}
-          </text>
-        </box>
-
-        {/* Cherry branch — top right */}
-        <box style={{ position: "absolute", right: 0, top: 0 }}>
-          <CherryBranch />
-        </box>
-      </box>
-
-      {/* === CHAT AREA === */}
-      <box style={{ flexGrow: 1, width: "100%", position: "relative" }}>
-        {/* Falling petals overlay */}
-        <Petals width={width} height={height - headerHeight - inputHeight - statusHeight} />
-
-        {/* Messages */}
-        <scrollbox style={{
+        {/* === HEADER === */}
+        <box style={{
+          flexDirection: "row",
+          height: headerHeight,
           width: "100%",
-          height: "100%",
-          paddingLeft: 3,
-          paddingRight: 3,
-          paddingTop: 1,
+          backgroundColor: C.headerBg,
+          paddingLeft: 2,
         }}>
-          {messages.map((msg, i) => (
-            <box key={`msg-${i}`} style={{ width: "100%", paddingBottom: 1 }}>
-              <text>
-                <span fg={
-                  msg.role === "user" ? C.userFg
-                    : msg.role === "agent" ? C.agentFg
-                      : C.systemFg
-                }>
-                  {msg.role === "user" ? "you> " : msg.role === "agent" ? "agent> " : "[system] "}
-                </span>
-                <span fg={msg.role === "system" ? C.systemFg : C.textFg}>
-                  {msg.content}
-                  {msg.role === "agent" && isStreaming && i === messages.length - 1 ? " ▊" : ""}
-                </span>
-              </text>
+          {/* Mascot */}
+          <Mascot />
+
+          {/* Title block */}
+          <box style={{ flexDirection: "column", paddingLeft: 2, paddingTop: 2 }}>
+            <text>
+              <span fg={C.titleFg}><b>CommandClaw</b></span>
+              {"  "}
+              <span fg={C.versionFg}>v0.1.0</span>
+              {"  "}
+              <span fg={C.sakura}>{"✿"}</span>
+            </text>
+            <text fg={C.dimFg}>
+              {agentId ? `agent: ${agentId}` : "connecting..."}
+            </text>
+          </box>
+
+          {/* Cherry branch — top right */}
+          <box style={{ position: "absolute", right: 1, top: 0 }}>
+            <CherryBranch />
+          </box>
+        </box>
+
+        {/* === CHAT AREA === */}
+        <box style={{ flexGrow: 1, width: "100%", position: "relative" }}>
+          {/* Falling petals overlay */}
+          <Petals width={canvasWidth} height={chatHeight} topOffset={2} />
+
+          {canvasWidth >= 56 && chatHeight >= 9 ? (
+            <box style={{ position: "absolute", right: 2, bottom: 1 }}>
+              <FujiScene />
             </box>
-          ))}
-        </scrollbox>
+          ) : null}
+
+          {/* Messages */}
+          <scrollbox style={{
+            width: "100%",
+            height: "100%",
+            paddingLeft: 3,
+            paddingRight: 3,
+            paddingTop: 1,
+          }} verticalScrollbarOptions={{ visible: false }}>
+            {messages.map((msg, i) => (
+              <box key={`msg-${i}`} style={{ width: "100%", paddingBottom: 1 }}>
+                <text>
+                  <span fg={
+                    msg.role === "user" ? C.userFg
+                      : msg.role === "agent" ? C.agentFg
+                        : C.systemFg
+                  }>
+                    {msg.role === "user" ? "you> " : msg.role === "agent" ? "agent> " : "[system] "}
+                  </span>
+                  <span fg={msg.role === "system" ? C.systemFg : C.textFg}>
+                    {msg.content}
+                    {msg.role === "agent" && isStreaming && i === messages.length - 1 ? " ▊" : ""}
+                  </span>
+                </text>
+              </box>
+            ))}
+          </scrollbox>
+        </box>
       </box>
 
       {/* === INPUT === */}
@@ -193,12 +213,10 @@ export function App() {
         height: statusHeight,
         width: "100%",
         backgroundColor: C.statusBg,
-        borderStyle: "single",
-        borderColor: C.inputBorderDim,
         flexDirection: "row",
         justifyContent: "space-between",
-        paddingLeft: 2,
-        paddingRight: 2,
+        paddingLeft: 4,
+        paddingRight: 4,
         position: "relative",
       }}>
         <text fg={C.dimFg}>
@@ -214,10 +232,6 @@ export function App() {
           ESC to quit
         </text>
 
-        {/* Fuji scene — bottom right */}
-        <box style={{ position: "absolute", right: 1, bottom: -7 }}>
-          <FujiScene />
-        </box>
       </box>
     </box>
   )

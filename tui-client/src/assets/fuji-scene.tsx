@@ -1,87 +1,90 @@
-// Japanese scenery — Mt. Fuji + pagoda + cherry trees
-// Positioned bottom-right of the status bar area
-// Half-block pixel art
+const F = {
+  snow: "#f4f1ff",
+  high: "#a9b4ea",
+  mid: "#6672b2",
+  low: "#3f487c",
+  water: "#253052",
+  water2: "#334374",
+  wood: "#7b4c3c",
+  roof: "#c35f68",
+  lantern: "#e2ad62",
+  blossom: "#f0a0b8",
+  blossomHot: "#d980a0",
+}
 
 const SCENE_ROWS = [
-  { segments: [
+  [
+    { text: "                  ", fg: "" },
+    { text: "▄", fg: F.snow },
+  ],
+  [
+    { text: "                 ", fg: "" },
+    { text: "▄█▄", fg: F.snow },
+  ],
+  [
     { text: "              ", fg: "" },
-    { text: "▄", fg: "#e0e0f0" },
-  ]},
-  { segments: [
-    { text: "             ", fg: "" },
-    { text: "▄", fg: "#e0e0f0" },
-    { text: "█", fg: "#e0e0f0", bg: "#7a5ca8" },
-    { text: "▄", fg: "#e0e0f0" },
-  ]},
-  { segments: [
-    { text: "           ", fg: "" },
-    { text: "▄", fg: "#7a5ca8" },
-    { text: "▓▓", fg: "#9d7cd8", bg: "#7a5ca8" },
-    { text: "█", fg: "#e0e0f0", bg: "#7a5ca8" },
-    { text: "▓▓", fg: "#9d7cd8", bg: "#7a5ca8" },
-    { text: "▄", fg: "#7a5ca8" },
-  ]},
-  { segments: [
-    { text: "    ", fg: "" },
-    { text: "▄▄", fg: "#f0a0b8" },
+    { text: "▄", fg: F.mid },
+    { text: "██", fg: F.high },
+    { text: "█", fg: F.snow },
+    { text: "██", fg: F.high },
+    { text: "▄", fg: F.mid },
+  ],
+  [
+    { text: "        ", fg: "" },
+    { text: "▄▄", fg: F.low },
+    { text: "███████████", fg: F.mid },
+    { text: "▄▄", fg: F.low },
+  ],
+  [
+    { text: "  ", fg: "" },
+    { text: "▄█▄", fg: F.blossom },
     { text: "   ", fg: "" },
-    { text: "▄", fg: "#7a5ca8" },
-    { text: "▓▓▓▓", fg: "#8b6cb8", bg: "#7a5ca8" },
-    { text: "▓▓▓▓", fg: "#8b6cb8", bg: "#7a5ca8" },
-    { text: "▄", fg: "#7a5ca8" },
-  ]},
-  { segments: [
+    { text: "▀▀", fg: F.low },
+    { text: "█████████", fg: F.low },
+    { text: "▀▀", fg: F.low },
+    { text: "   ", fg: "" },
+    { text: "▄▄▄", fg: F.roof },
+  ],
+  [
+    { text: " ", fg: "" },
+    { text: "▄██▄", fg: F.blossomHot },
+    { text: "        ", fg: "" },
+    { text: "░░░░░░", fg: F.water2 },
+    { text: "    ", fg: "" },
+    { text: "▄███▄", fg: F.roof },
+  ],
+  [
     { text: "  ", fg: "" },
-    { text: "▄", fg: "#f7a8c4" },
-    { text: "█▓", fg: "#f0a0b8" },
-    { text: "▄", fg: "#f7a8c4" },
+    { text: "█", fg: F.wood },
+    { text: "▓", fg: F.lantern },
+    { text: "█", fg: F.wood },
+    { text: "     ", fg: "" },
+    { text: "▄▄", fg: F.wood },
     { text: " ", fg: "" },
-    { text: "▄█▄", fg: "#6b5242" },
-    { text: "▓▓▓▓▓▓", fg: "#6b5242", bg: "#7a5ca8" },
-    { text: "▓▓▓▓▓▓", fg: "#6b5242", bg: "#7a5ca8" },
-    { text: "▄", fg: "#7a5ca8" },
-  ]},
-  { segments: [
-    { text: "  ", fg: "" },
-    { text: "▀", fg: "#f0a0b8" },
-    { text: "█", fg: "#8b6952" },
-    { text: "▀", fg: "#f0a0b8" },
-    { text: " ", fg: "" },
-    { text: "█", fg: "#8b6952" },
-    { text: "▓", fg: "#a08060" },
-    { text: "█", fg: "#8b6952" },
-    { text: " ", fg: "" },
-    { text: "▄█▄", fg: "#6b5242" },
-    { text: "▄", fg: "#e0a040" },
-    { text: "█", fg: "#6b5242" },
-  ]},
-  { segments: [
-    { text: "  ", fg: "" },
-    { text: " ", fg: "" },
-    { text: "█", fg: "#6b4232" },
-    { text: "  ", fg: "" },
-    { text: "█", fg: "#6b4232" },
-    { text: "▓", fg: "#a08060" },
-    { text: "█", fg: "#6b4232" },
-    { text: " ", fg: "" },
-    { text: "█", fg: "#6b4232" },
-    { text: "▓▓", fg: "#a08060" },
-    { text: "█", fg: "#e0a040", bg: "#6b5242" },
-    { text: "█", fg: "#6b4232" },
-  ]},
-  { segments: [
-    { text: "▒▒▓▓▒▒▓▓▒▒▓▓▒▒▓▓▒", fg: "#2a3050" },
-  ]},
+    { text: "▄▄", fg: F.wood },
+    { text: "     ", fg: "" },
+    { text: "█", fg: F.wood },
+    { text: "▓", fg: F.lantern },
+    { text: "▓", fg: F.roof },
+    { text: "█", fg: F.wood },
+  ],
+  [
+    { text: "▓▓▓▓", fg: F.water },
+    { text: "▒▒▒▒▒▒", fg: F.water2 },
+    { text: "▓▓▓▓▓", fg: F.water },
+    { text: "▒▒▒▒▒▒", fg: F.water2 },
+    { text: "▓▓▓▓▓", fg: F.water },
+  ],
 ]
 
 export function FujiScene() {
   return (
-    <box style={{ flexDirection: "column", width: 20, height: 8 }}>
+    <box style={{ flexDirection: "column", width: 32, height: 8 }}>
       {SCENE_ROWS.map((row, i) => (
         <text key={`fj-${i}`}>
-          {row.segments.map((seg, j) =>
+          {row.map((seg, j) =>
             seg.fg
-              ? <span key={`s-${i}-${j}`} fg={seg.fg} bg={seg.bg}>{seg.text}</span>
+              ? <span key={`s-${i}-${j}`} fg={seg.fg}>{seg.text}</span>
               : <span key={`s-${i}-${j}`}>{seg.text}</span>
           )}
         </text>

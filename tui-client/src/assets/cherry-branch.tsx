@@ -1,71 +1,89 @@
-// Cherry blossom branch — extends from top-right corner
-// Half-block pixel art, designed to be positioned absolute top-right
+const B = {
+  wood: "#7a4d40",
+  bark: "#4f3040",
+  dark: "#2a1e2c",
+  pink: "#f6a6c3",
+  hot: "#e789aa",
+  pale: "#ffc0d9",
+  white: "#ffdce8",
+}
 
 const BRANCH_ROWS = [
-  { segments: [
-    { text: "                         ", fg: "" },
-    { text: "▄▄▄", fg: "#f7a8c4" },
-    { text: "▄", fg: "#ffb7d5" },
-    { text: "▄▄", fg: "#f7a8c4" },
-  ]},
-  { segments: [
-    { text: "                      ", fg: "" },
-    { text: "▄", fg: "#e890ab" },
-    { text: "█▓▒", fg: "#f7a8c4" },
-    { text: "▓█", fg: "#ffb7d5" },
-    { text: "▓▒", fg: "#f7a8c4" },
-    { text: "▄", fg: "#e890ab" },
-  ]},
-  { segments: [
-    { text: "                    ", fg: "" },
-    { text: "▄", fg: "#e890ab" },
-    { text: "▓█", fg: "#ffb7d5" },
-    { text: "▒", fg: "#f7a8c4" },
-    { text: "▄▄", fg: "#8b6952" },
-    { text: "▒", fg: "#f7a8c4" },
-    { text: "█▓", fg: "#ffb7d5" },
-    { text: "▄", fg: "#e890ab" },
-  ]},
-  { segments: [
-    { text: "                  ", fg: "" },
-    { text: "▀", fg: "#f7a8c4" },
-    { text: "▓▒", fg: "#e890ab" },
-    { text: "▄▄▄▄", fg: "#8b6952" },
-    { text: "▒▓", fg: "#e890ab" },
-    { text: "▀", fg: "#f7a8c4" },
-  ]},
-  { segments: [
-    { text: "              ", fg: "" },
-    { text: "▄▄▄", fg: "#f7a8c4" },
-    { text: "▄▄", fg: "#8b6952" },
-    { text: "▀▀▀▀", fg: "#6b5242" },
-  ]},
-  { segments: [
-    { text: "           ", fg: "" },
-    { text: "▄", fg: "#e890ab" },
-    { text: "▓█▓", fg: "#f7a8c4" },
-    { text: "▄▄", fg: "#8b6952" },
-    { text: "▀▀", fg: "#6b5242" },
-  ]},
-  { segments: [
+  [
+    { text: "                          ", fg: "" },
+    { text: "▄", fg: B.hot },
+    { text: "▄█▄", fg: B.pink },
+    { text: "  ", fg: "" },
+    { text: "▄█▄", fg: B.pale },
+  ],
+  [
+    { text: "                     ", fg: "" },
+    { text: "▄█▄", fg: B.pink },
+    { text: " ▄", fg: B.hot },
+    { text: "██", fg: B.pink },
+    { text: "▓", fg: B.white },
+    { text: "██▄", fg: B.pink },
+  ],
+  [
+    { text: "                 ", fg: "" },
+    { text: "▄█▄", fg: B.hot },
+    { text: "  ", fg: "" },
+    { text: "▄", fg: B.wood },
+    { text: "▀▀▀", fg: B.bark },
+    { text: "▄", fg: B.wood },
+    { text: " ", fg: "" },
+    { text: "▀█", fg: B.hot },
+    { text: "▓", fg: B.white },
+    { text: "█▀", fg: B.pink },
+  ],
+  [
+    { text: "             ", fg: "" },
+    { text: "▄██", fg: B.pink },
+    { text: "▓", fg: B.white },
+    { text: "██▄", fg: B.hot },
+    { text: "   ", fg: "" },
+    { text: "▀▀▀▀", fg: B.bark },
+    { text: "▄▄", fg: B.wood },
+  ],
+  [
     { text: "          ", fg: "" },
-    { text: "▀", fg: "#f7a8c4" },
-    { text: "▒▓", fg: "#e890ab" },
-    { text: "▀", fg: "#f7a8c4" },
-    { text: "▀", fg: "#8b6952" },
-  ]},
-  { segments: [
-    { text: "            ", fg: "" },
-    { text: "▀", fg: "#e890ab" },
-  ]},
+    { text: "▄", fg: B.wood },
+    { text: "▀▀▀", fg: B.bark },
+    { text: "▄", fg: B.wood },
+    { text: "      ", fg: "" },
+    { text: "▄▄", fg: B.wood },
+    { text: "▀▀▀", fg: B.bark },
+  ],
+  [
+    { text: "       ", fg: "" },
+    { text: "▄█▄", fg: B.pale },
+    { text: "  ", fg: "" },
+    { text: "▀▀▀▀", fg: B.bark },
+    { text: "▄▄▄", fg: B.wood },
+  ],
+  [
+    { text: "        ", fg: "" },
+    { text: "▀█", fg: B.hot },
+    { text: "▓", fg: B.white },
+    { text: "█▀", fg: B.pink },
+    { text: "   ", fg: "" },
+    { text: "▀▀", fg: B.bark },
+    { text: "▄", fg: B.wood },
+  ],
+  [
+    { text: "          ", fg: "" },
+    { text: "▀", fg: B.pink },
+    { text: "       ", fg: "" },
+    { text: "▀", fg: B.bark },
+  ],
 ]
 
 export function CherryBranch() {
   return (
-    <box style={{ flexDirection: "column", width: 35, height: 8 }}>
+    <box style={{ flexDirection: "column", width: 38, height: 8 }}>
       {BRANCH_ROWS.map((row, i) => (
         <text key={`br-${i}`}>
-          {row.segments.map((seg, j) =>
+          {row.map((seg, j) =>
             seg.fg
               ? <span key={`s-${i}-${j}`} fg={seg.fg}>{seg.text}</span>
               : <span key={`s-${i}-${j}`}>{seg.text}</span>
