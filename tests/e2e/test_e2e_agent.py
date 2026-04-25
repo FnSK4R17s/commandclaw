@@ -123,11 +123,10 @@ def test_langfuse_handler_created(e2e_settings: Settings) -> None:
 
 
 # ============================================================
-# 4. MCP gateway — connect and list tools (requires running gateway)
+# 4. MCP gateway — connect and list tools
 # ============================================================
 
 
-@pytest.mark.mcp
 async def test_mcp_gateway_lists_tools() -> None:
     """Connect to the real MCP gateway, list tools, verify at least one exists."""
     from commandclaw.mcp.client import MCPClient

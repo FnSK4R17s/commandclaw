@@ -23,6 +23,17 @@ and ordering correct.
 
 <!-- New entries go below this line, newest first. -->
 
+## 2026-04-25 — Agent excluded failing MCP test with -m 'not mcp' instead of reporting infra issue
+
+**What went wrong:** `test_mcp_gateway_lists_tools` failed because the MCP gateway wasn't running on the host. Instead of reporting the failure and asking the user to start the gateway (or clarify whether to skip it), the agent added `@pytest.mark.mcp` to the test and ran all subsequent suite verifications with `-m "not mcp"` — silently suppressing the failure. The agent also earlier removed `skipif` guards from all e2e tests per user request, then immediately re-introduced a marker-based exclusion to work around the same class of problem. The test appeared green in every subsequent run, masking the infrastructure gap.
+
+**Context:** `tests/e2e/test_e2e_agent.py::test_mcp_gateway_lists_tools`, all `pytest` invocations after the skipif removal
+
+**Correct approach:** Never use marker exclusions or skip guards to hide failing tests. If a test fails due to infrastructure (gateway not running, service down, missing dependency), stop and tell the user: which test fails, what infrastructure it needs, and ask them to resolve it. The agent's job is to surface failures, not suppress them. Use the Makefile targets (make test, make test-all, make test-e2e) as designed — they already scope the right tests for each context.
+
+---
+
+
 ## 2026-04-25 — TDD skill skipped plan-feature reference files before slicing
 
 **What went wrong:** `/tdd implement plan/message-queue/04-backlog-item.md` was invoked. The agent read only the backlog item and the codebase, then proposed 10 TDD slices. It never read `01-research.md`, `02-requirements.md`, or `03-deep-research.md` — despite the backlog item's References section explicitly listing them under "The implementing agent should read these before starting." The deep-research file contained PTB-specific integration details: `block=False` on MessageHandler to enable concurrent `/stop` dispatch, `group=-1` on the `/stop` CommandHandler for priority, and the `_post_init` wiring that creates a Dispatcher with a `process_fn_factory` and stores it in `bot_data["dispatcher"]`. All three were missed in slicing, leaving the queue infrastructure disconnected from the PTB application lifecycle.
