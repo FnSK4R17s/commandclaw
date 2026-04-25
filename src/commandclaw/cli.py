@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import readline  # noqa: F401 — enables line editing (backspace, arrows) in input()
 import sys
 
 from commandclaw.config import Settings
@@ -33,14 +32,47 @@ def parse_mode(argv: list[str] | None = None) -> str:
 
 
 async def run_chat(settings: Settings) -> None:
-    """Build the agent and hand off to the chat REPL."""
-    from commandclaw.agent.graph import build_agent_graph
+    """Build the agent, wire a Dispatcher, and launch the Textual TUI."""
+    from commandclaw.agent.graph import build_agent_graph, invoke_agent
     from commandclaw.agent.persistence import open_checkpointer
-    from commandclaw.chat import chat_loop
+    from commandclaw.message.dispatcher import Dispatcher
+    from commandclaw.tui.chat import ChatApp
 
     saver, close_checkpointer = await open_checkpointer(settings)
     agent, mcp_client = await build_agent_graph(settings, checkpointer=saver)
-    await chat_loop(settings, agent, mcp_client, close_checkpointer)
+
+    app = ChatApp()
+
+    def process_fn_factory(session_id: str):
+        async def process_fn(envelope):
+            result = await invoke_agent(
+                agent, envelope.content, settings,
+                session_id=session_id, user_id=session_id,
+            )
+            if result.success:
+                app.display_agent_response(result.output)
+            else:
+                app._display_system(f"Error: {result.error or 'Unknown error'}")
+
+        return process_fn
+
+    dispatcher = Dispatcher(
+        process_fn_factory,
+        queue_maxsize=settings.queue_cap,
+        discard_ttl=settings.discard_ttl_seconds,
+    )
+    app.dispatcher = dispatcher
+
+    try:
+        await app.run_async()
+    finally:
+        await dispatcher.shutdown()
+        if mcp_client is not None:
+            try:
+                await mcp_client.disconnect()
+            except Exception:
+                pass
+        await close_checkpointer()
 
 
 def main() -> None:
@@ -80,6 +112,8 @@ def main() -> None:
     )
 
     if mode in ("chat", "bootstrap"):
+        logging.getLogger().handlers.clear()
+        logging.getLogger().addHandler(logging.FileHandler(".commandclaw-chat.log"))
         asyncio.run(run_chat(settings))
     else:
         from commandclaw.telegram.bot import start_bot

@@ -1,4 +1,10 @@
-"""Interactive chat REPL and bootstrap loop."""
+"""Interactive chat REPL and bootstrap loop.
+
+.. deprecated::
+    Replaced by ``commandclaw.tui.chat.ChatApp`` (Textual TUI).
+    This module is retained for ``build_bootstrap_message`` and hatching logic
+    only. The ``chat_loop`` function is no longer called from the CLI.
+"""
 
 from __future__ import annotations
 
