@@ -14,10 +14,12 @@ from telegram.ext import (
     filters,
 )
 
-from commandclaw.agent.graph import build_agent_graph
+from commandclaw.agent.graph import build_agent_graph, invoke_agent
 from commandclaw.agent.persistence import open_checkpointer
 from commandclaw.config import Settings
+from commandclaw.message.dispatcher import Dispatcher
 from commandclaw.telegram.handlers import create_message_handler
+from commandclaw.telegram.sender import send_error_alert, send_message
 
 log = logging.getLogger(__name__)
 
@@ -53,8 +55,16 @@ async def _post_init(application: Application) -> None:
     application.bot_data[_BOT_DATA_MCP_CLIENT] = mcp_client
     application.bot_data[_BOT_DATA_CHECKPOINTER_CLOSE] = close_checkpointer
 
+    factory = create_process_fn_factory(agent, settings, application.bot)
+    dispatcher = Dispatcher(
+        factory,
+        queue_maxsize=settings.queue_cap,
+        discard_ttl=settings.discard_ttl_seconds,
+    )
+    application.bot_data["dispatcher"] = dispatcher
+
     handler = create_message_handler(settings)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handler))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handler, block=False))
     log.info("Agent + handler wired into Telegram application")
 
 
@@ -159,6 +169,37 @@ async def _recover_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
 
 
+def create_process_fn_factory(agent, settings, bot):
+    """Build a factory that produces per-session process functions for the Dispatcher."""
+
+    def factory(session_id):
+        async def process_fn(envelope):
+            result = await invoke_agent(
+                agent,
+                envelope.content,
+                settings,
+                session_id=session_id,
+                user_id=session_id,
+            )
+            if result.success:
+                await send_message(
+                    bot,
+                    int(session_id),
+                    result.output,
+                    chunk_size=settings.telegram_chunk_size,
+                )
+            else:
+                await send_error_alert(
+                    bot,
+                    int(session_id),
+                    result.error or "Unknown error",
+                )
+
+        return process_fn
+
+    return factory
+
+
 def start_bot(settings: Settings) -> None:
     """Build the Telegram application and start polling. Blocking."""
     app = (
@@ -171,7 +212,7 @@ def start_bot(settings: Settings) -> None:
 
     app.bot_data[_BOT_DATA_SETTINGS] = settings
     app.add_handler(CommandHandler("start", _start_command))
-    app.add_handler(CommandHandler("stop", _stop_command))
+    app.add_handler(CommandHandler("stop", _stop_command), group=-1)
     app.add_handler(CommandHandler("discarded", _discarded_command))
     app.add_handler(CommandHandler("recover", _recover_command))
 
