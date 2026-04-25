@@ -1,0 +1,21 @@
+{
+  "name": "commandclaw-tui",
+  "module": "index.tsx",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run index.tsx",
+    "dev": "bun --watch index.tsx"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.1.103",
+    "@opentui/react": "^0.1.103",
+    "react": "^19.2.5"
+  }
+}
