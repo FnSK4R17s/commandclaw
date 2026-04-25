@@ -1,13 +1,12 @@
 """E2e tests — message queue with real LLM.
 
 Run with: ./.venv/bin/pytest -m e2e -k message_queue -v
-Requires COMMANDCLAW_OPENAI_API_KEY in .env. Skips cleanly when absent.
+Keys loaded from .env via conftest.
 """
 
 from __future__ import annotations
 
 import asyncio
-import os
 from pathlib import Path
 
 import pytest
@@ -15,8 +14,6 @@ import pytest
 from commandclaw.config import Settings
 
 pytestmark = pytest.mark.e2e
-
-_HAS_OPENAI_KEY = bool(os.environ.get("COMMANDCLAW_OPENAI_API_KEY", ""))
 
 
 def _load_settings() -> Settings:
@@ -55,7 +52,7 @@ def mq_settings(e2e_vault: Path, tmp_path: Path) -> Settings:
 # ============================================================
 
 
-@pytest.mark.skipif(not _HAS_OPENAI_KEY, reason="COMMANDCLAW_OPENAI_API_KEY not set")
+
 async def test_message_queue_real_llm_response(mq_settings: Settings) -> None:
     """Dispatch a message through the queue — real LLM processes it and result is captured."""
     from commandclaw.agent.graph import build_agent_graph, invoke_agent
@@ -110,7 +107,7 @@ async def test_message_queue_real_llm_response(mq_settings: Settings) -> None:
 # ============================================================
 
 
-@pytest.mark.skipif(not _HAS_OPENAI_KEY, reason="COMMANDCLAW_OPENAI_API_KEY not set")
+
 async def test_message_queue_serial_real_llm(mq_settings: Settings) -> None:
     """Two messages dispatched rapidly — both processed in order by real LLM."""
     from commandclaw.agent.graph import build_agent_graph, invoke_agent
@@ -166,7 +163,7 @@ async def test_message_queue_serial_real_llm(mq_settings: Settings) -> None:
 # ============================================================
 
 
-@pytest.mark.skipif(not _HAS_OPENAI_KEY, reason="COMMANDCLAW_OPENAI_API_KEY not set")
+
 async def test_message_queue_abort_real_llm(mq_settings: Settings) -> None:
     """Dispatch a slow prompt, abort mid-flight — task cancelled, pending discarded."""
     from commandclaw.agent.graph import build_agent_graph, invoke_agent

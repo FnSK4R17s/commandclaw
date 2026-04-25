@@ -1,12 +1,11 @@
 """E2e tests — real LLM, real Langfuse, real MCP gateway.
 
 Run with: ./.venv/bin/pytest -m e2e -v
-Requires keys in .env. Skips cleanly when keys are absent.
+Keys loaded from .env via conftest.
 """
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -14,13 +13,6 @@ import pytest
 from commandclaw.config import Settings
 
 pytestmark = pytest.mark.e2e
-
-_HAS_OPENAI_KEY = bool(os.environ.get("COMMANDCLAW_OPENAI_API_KEY", ""))
-_HAS_LANGFUSE_KEYS = bool(
-    os.environ.get("COMMANDCLAW_LANGFUSE_PUBLIC_KEY", "")
-    and os.environ.get("COMMANDCLAW_LANGFUSE_SECRET_KEY", "")
-)
-_HAS_MCP_GATEWAY = bool(os.environ.get("COMMANDCLAW_MCP_GATEWAY_URL", ""))
 
 
 def _load_settings() -> Settings:
@@ -64,7 +56,7 @@ def e2e_settings(e2e_vault: Path, tmp_path: Path) -> Settings:
 # ============================================================
 
 
-@pytest.mark.skipif(not _HAS_OPENAI_KEY, reason="COMMANDCLAW_OPENAI_API_KEY not set")
+
 async def test_real_llm_responds(e2e_settings: Settings) -> None:
     """Send a trivial message to the real LLM and get a coherent response."""
     from commandclaw.agent.graph import build_agent_graph, invoke_agent
@@ -88,7 +80,7 @@ async def test_real_llm_responds(e2e_settings: Settings) -> None:
 # ============================================================
 
 
-@pytest.mark.skipif(not _HAS_OPENAI_KEY, reason="COMMANDCLAW_OPENAI_API_KEY not set")
+
 async def test_real_llm_uses_file_read(e2e_settings: Settings) -> None:
     """Ask the LLM to read IDENTITY.md — it should use file_read and return content."""
     from commandclaw.agent.graph import build_agent_graph, invoke_agent
@@ -114,7 +106,7 @@ async def test_real_llm_uses_file_read(e2e_settings: Settings) -> None:
 # ============================================================
 
 
-@pytest.mark.skipif(not _HAS_LANGFUSE_KEYS, reason="Langfuse keys not set")
+
 def test_langfuse_handler_created(e2e_settings: Settings) -> None:
     """With real Langfuse keys, create_langfuse_handler returns a real handler."""
     from commandclaw.tracing.langfuse_tracing import TracingManager, reset_default_manager
@@ -131,11 +123,11 @@ def test_langfuse_handler_created(e2e_settings: Settings) -> None:
 
 
 # ============================================================
-# 4. MCP gateway — connect and list tools
+# 4. MCP gateway — connect and list tools (requires running gateway)
 # ============================================================
 
 
-@pytest.mark.skipif(not _HAS_MCP_GATEWAY, reason="COMMANDCLAW_MCP_GATEWAY_URL not set")
+@pytest.mark.mcp
 async def test_mcp_gateway_lists_tools() -> None:
     """Connect to the real MCP gateway, list tools, verify at least one exists."""
     from commandclaw.mcp.client import MCPClient
@@ -160,7 +152,7 @@ async def test_mcp_gateway_lists_tools() -> None:
 # ============================================================
 
 
-@pytest.mark.skipif(not _HAS_OPENAI_KEY, reason="COMMANDCLAW_OPENAI_API_KEY not set")
+
 async def test_real_llm_multi_turn(e2e_settings: Settings) -> None:
     """Two-turn conversation with real LLM — second turn references the first."""
     from commandclaw.agent.graph import build_agent_graph, invoke_agent
