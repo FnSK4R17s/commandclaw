@@ -112,6 +112,10 @@ class Settings(BaseSettings):
         description="LangGraph recursion_limit: max super-steps before GraphRecursionError.",
     )
 
+    # --- API Server ---
+    api_host: str = Field(default="127.0.0.1", description="API server bind host.")
+    api_port: int = Field(default=8080, ge=1, le=65535, description="API server port.")
+
     # --- Persistence ---
     checkpoint_db: Path | None = Field(
         default=None,

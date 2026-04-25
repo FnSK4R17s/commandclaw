@@ -86,8 +86,8 @@ def main() -> None:
 
     mode = parse_mode()
 
-    if mode not in ("chat", "telegram", "bootstrap"):
-        print("Usage: commandclaw [chat|telegram|bootstrap]")
+    if mode not in ("chat", "telegram", "bootstrap", "serve"):
+        print("Usage: commandclaw [chat|telegram|bootstrap|serve]")
         sys.exit(1)
 
     settings = Settings()
@@ -115,6 +115,10 @@ def main() -> None:
         logging.getLogger().handlers.clear()
         logging.getLogger().addHandler(logging.FileHandler(".commandclaw-chat.log"))
         asyncio.run(run_chat(settings))
+    elif mode == "serve":
+        from commandclaw.api.server import run_server
+
+        run_server(settings)
     else:
         from commandclaw.telegram.bot import start_bot
 
