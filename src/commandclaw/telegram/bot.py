@@ -14,12 +14,12 @@ from telegram.ext import (
     filters,
 )
 
-from commandclaw.agent.graph import build_agent_graph, invoke_agent
+from commandclaw.agent.graph import build_agent_graph, stream_agent
 from commandclaw.agent.persistence import open_checkpointer
 from commandclaw.config import Settings
 from commandclaw.message.dispatcher import Dispatcher
 from commandclaw.telegram.handlers import create_message_handler
-from commandclaw.telegram.sender import send_error_alert, send_message
+from commandclaw.telegram.sender import StreamingSender, send_error_alert
 
 log = logging.getLogger(__name__)
 
@@ -174,20 +174,17 @@ def create_process_fn_factory(agent, settings, bot):
 
     def factory(session_id):
         async def process_fn(envelope):
-            result = await invoke_agent(
+            sender = StreamingSender(bot, int(session_id))
+            result = await stream_agent(
                 agent,
                 envelope.content,
                 settings,
                 session_id=session_id,
                 user_id=session_id,
+                on_token=sender.on_token,
             )
             if result.success:
-                await send_message(
-                    bot,
-                    int(session_id),
-                    result.output,
-                    chunk_size=settings.telegram_chunk_size,
-                )
+                await sender.finalize()
             else:
                 await send_error_alert(
                     bot,

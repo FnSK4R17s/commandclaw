@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
@@ -185,7 +186,10 @@ async def invoke_agent(
         session_id=session_id,
     )
     thread_id = f"{context.agent_id}/{session_id or 'main'}"
-    config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
+    config: dict[str, Any] = {
+        "configurable": {"thread_id": thread_id},
+        "recursion_limit": settings.agent_recursion_limit,
+    }
 
     handler = create_langfuse_handler(settings, session_id=session_id, user_id=user_id)
     if handler is not None:
@@ -247,5 +251,100 @@ async def invoke_agent(
                 await asyncio.sleep(delay)
             else:
                 log.exception("Agent invocation failed after %d attempt(s)", attempt + 1)
+
+    return AgentResult(output="", success=False, error=last_error)
+
+
+async def stream_agent(
+    agent: Any,
+    message: str,
+    settings: Settings,
+    *,
+    session_id: str | None = None,
+    user_id: str | None = None,
+    abort_event: asyncio.Event | None = None,
+    on_token: Callable[[str], Any] | None = None,
+) -> AgentResult:
+    """Stream agent response token-by-token via ``on_token`` callback.
+
+    Returns the same ``AgentResult`` as ``invoke_agent`` — callers can inspect
+    ``.success`` / ``.error`` after the stream completes.
+    """
+    from commandclaw.tracing.langfuse_tracing import create_langfuse_handler
+
+    if abort_event is not None and abort_event.is_set():
+        raise asyncio.CancelledError
+
+    context = CommandClawContext(
+        vault_path=str(settings.vault_path),
+        agent_id=settings.agent_id or "default",
+        api_key=settings.openai_api_key,
+        user_id=user_id,
+        session_id=session_id,
+    )
+    thread_id = f"{context.agent_id}/{session_id or 'main'}"
+    config: dict[str, Any] = {
+        "configurable": {"thread_id": thread_id},
+        "recursion_limit": settings.agent_recursion_limit,
+    }
+
+    handler = create_langfuse_handler(settings, session_id=session_id, user_id=user_id)
+    if handler is not None:
+        config["callbacks"] = [handler]
+
+    last_error: str | None = None
+    for attempt in range(settings.max_retries + 1):
+        if abort_event is not None and abort_event.is_set():
+            raise asyncio.CancelledError
+        try:
+            output_parts: list[str] = []
+            async for chunk in agent.astream(
+                {"messages": [HumanMessage(content=message)]},
+                config=config,
+                context=context,
+                stream_mode="messages",
+                version="v2",
+            ):
+                if abort_event is not None and abort_event.is_set():
+                    raise asyncio.CancelledError
+                if chunk["type"] != "messages":
+                    continue
+                msg, _meta = chunk["data"]
+                if _meta.get("langgraph_node") != "model":
+                    continue
+                if not isinstance(msg, AIMessage) or not msg.content:
+                    continue
+                token = msg.content
+                if isinstance(token, list):
+                    token = "".join(
+                        b.get("text", "") if isinstance(b, dict) else str(b)
+                        for b in token
+                    )
+                if not token:
+                    continue
+                output_parts.append(token)
+                if on_token is not None:
+                    result = on_token(token)
+                    if asyncio.iscoroutine(result):
+                        await result
+
+            return AgentResult(output="".join(output_parts), success=True)
+
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            raise
+        except Exception as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+            if attempt < settings.max_retries:
+                delay = settings.retry_base_delay * (2 ** attempt)
+                log.warning(
+                    "Stream failed (attempt %d/%d): %s — retrying in %.1fs",
+                    attempt + 1,
+                    settings.max_retries + 1,
+                    last_error,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+            else:
+                log.exception("Stream failed after %d attempt(s)", attempt + 1)
 
     return AgentResult(output="", success=False, error=last_error)

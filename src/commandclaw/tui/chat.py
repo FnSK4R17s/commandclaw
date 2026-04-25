@@ -95,6 +95,24 @@ class ChatApp(App):
         except Exception:
             pass
 
+    def begin_agent_response(self) -> None:
+        """Write the ``agent>`` prefix before streaming tokens."""
+        try:
+            self.query_one("#message-log", RichLog).write("agent> ", expand=True)
+        except Exception:
+            pass
+
+    def stream_agent_token(self, token: str) -> None:
+        """Append a single token chunk to the current agent response line."""
+        try:
+            self.query_one("#message-log", RichLog).write(token, expand=True)
+        except Exception:
+            pass
+
+    def end_agent_response(self, full_text: str) -> None:
+        """Record the complete agent response in message history."""
+        self.messages.append(f"agent> {full_text}")
+
     def display_agent_response(self, text: str) -> None:
         msg = f"agent> {text}"
         self.messages.append(msg)

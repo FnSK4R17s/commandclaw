@@ -106,6 +106,11 @@ class Settings(BaseSettings):
         default=16_384,
         description="Cap on model max_tokens. Override per-deploy for large-context models.",
     )
+    agent_recursion_limit: int = Field(
+        default=100,
+        ge=1,
+        description="LangGraph recursion_limit: max super-steps before GraphRecursionError.",
+    )
 
     # --- Persistence ---
     checkpoint_db: Path | None = Field(

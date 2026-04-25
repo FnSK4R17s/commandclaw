@@ -18,8 +18,8 @@ def _make_settings(chunk_size: int = 4000) -> MagicMock:
 
 
 class TestProcessFnFactory:
-    async def test_process_fn_calls_invoke_agent_and_sends_result(self) -> None:
-        """process_fn invokes the agent with the envelope content and sends the result to the user."""
+    async def test_process_fn_streams_and_finalizes(self) -> None:
+        """process_fn streams tokens via StreamingSender and finalizes on success."""
         mock_agent = MagicMock()
         mock_bot = AsyncMock()
         settings = _make_settings(chunk_size=4000)
@@ -28,32 +28,29 @@ class TestProcessFnFactory:
 
         envelope = MsgEnvelope(session_id="7", content="user message", message_type="user")
 
+        async def fake_stream(agent, msg, s, *, session_id, user_id, on_token=None):
+            if on_token is not None:
+                await on_token("hello ")
+                await on_token("from agent")
+            return success_result
+
         with (
-            patch("commandclaw.telegram.bot.invoke_agent", new=AsyncMock(return_value=success_result)) as mock_invoke,
-            patch("commandclaw.telegram.bot.send_message", new=AsyncMock()) as mock_send,
-            patch("commandclaw.telegram.bot.send_error_alert", new=AsyncMock()) as mock_send_error,
+            patch("commandclaw.telegram.bot.stream_agent", side_effect=fake_stream) as mock_stream,
+            patch("commandclaw.telegram.bot.send_error_alert", new=AsyncMock()) as mock_err,
         ):
             factory = create_process_fn_factory(mock_agent, settings, mock_bot)
             process_fn = factory("7")
             await process_fn(envelope)
 
-            mock_invoke.assert_called_once_with(
-                mock_agent,
-                "user message",
-                settings,
-                session_id="7",
-                user_id="7",
-            )
-            mock_send.assert_called_once_with(
-                mock_bot,
-                7,
-                "hello from agent",
-                chunk_size=4000,
-            )
-            mock_send_error.assert_not_called()
+            mock_stream.assert_called_once()
+            call_kwargs = mock_stream.call_args
+            assert call_kwargs[0][1] == "user message"
+            assert call_kwargs[1]["session_id"] == "7"
+            mock_err.assert_not_called()
+            assert mock_bot.send_message.called
 
     async def test_process_fn_sends_error_on_failure(self) -> None:
-        """process_fn calls send_error_alert when invoke_agent returns success=False."""
+        """process_fn calls send_error_alert when stream_agent returns success=False."""
         mock_agent = MagicMock()
         mock_bot = AsyncMock()
         settings = _make_settings()
@@ -62,21 +59,15 @@ class TestProcessFnFactory:
 
         envelope = MsgEnvelope(session_id="42", content="fail me", message_type="user")
 
+        async def fake_stream(agent, msg, s, *, session_id, user_id, on_token=None):
+            return failure_result
+
         with (
-            patch("commandclaw.telegram.bot.invoke_agent", new=AsyncMock(return_value=failure_result)) as mock_invoke,
-            patch("commandclaw.telegram.bot.send_message", new=AsyncMock()) as mock_send,
-            patch("commandclaw.telegram.bot.send_error_alert", new=AsyncMock()) as mock_send_error,
+            patch("commandclaw.telegram.bot.stream_agent", side_effect=fake_stream),
+            patch("commandclaw.telegram.bot.send_error_alert", new=AsyncMock()) as mock_err,
         ):
             factory = create_process_fn_factory(mock_agent, settings, mock_bot)
             process_fn = factory("42")
             await process_fn(envelope)
 
-            mock_invoke.assert_called_once_with(
-                mock_agent,
-                "fail me",
-                settings,
-                session_id="42",
-                user_id="42",
-            )
-            mock_send.assert_not_called()
-            mock_send_error.assert_called_once_with(mock_bot, 42, "boom")
+            mock_err.assert_called_once_with(mock_bot, 42, "boom")

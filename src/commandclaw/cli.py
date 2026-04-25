@@ -33,7 +33,7 @@ def parse_mode(argv: list[str] | None = None) -> str:
 
 async def run_chat(settings: Settings) -> None:
     """Build the agent, wire a Dispatcher, and launch the Textual TUI."""
-    from commandclaw.agent.graph import build_agent_graph, invoke_agent
+    from commandclaw.agent.graph import build_agent_graph, stream_agent
     from commandclaw.agent.persistence import open_checkpointer
     from commandclaw.message.dispatcher import Dispatcher
     from commandclaw.tui.chat import ChatApp
@@ -45,7 +45,7 @@ async def run_chat(settings: Settings) -> None:
 
     def process_fn_factory(session_id: str):
         async def process_fn(envelope):
-            result = await invoke_agent(
+            result = await stream_agent(
                 agent, envelope.content, settings,
                 session_id=session_id, user_id=session_id,
             )
