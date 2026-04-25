@@ -23,6 +23,16 @@ and ordering correct.
 
 <!-- New entries go below this line, newest first. -->
 
+## 2026-04-25 — NeMo Guardrails prompt used wrong answer format, blocking all input
+
+**What went wrong:** The `self_check_input` prompt in `config.yml` asked the LLM to respond with `"allowed"` / `"blocked"`. NeMo's default `is_content_safe` output parser expects `"Yes"` (block) / `"No"` (allow). The LLM returned `"allowed"`, the parser didn't find `"Yes"`, interpreted this as empty → `allowed: False` → every message blocked. The engine's string matching at `engine.py:128` checked for `"can't do that"` / `"blocked"` in NeMo's refusal text but didn't match NeMo's actual refusal `"I'm sorry, I can't respond to that."`, so violations came back empty. E2e tests passed because the double bug cancelled out: NeMo blocked internally, engine didn't detect the block, agent ran anyway. No test ever verified NeMo integration — all unit tests used `nemo_config_path=None` (regex-only) and all e2e tests went through the broken path undetected.
+
+**Correct approach:** NeMo self-check prompts must ask `"Should this be blocked? Answer [Yes/No]:"` — Yes means block, No means allow. This is NeMo's convention, not negotiable. The engine's refusal detection must match all known refusal phrases from `rails.co` (not just one substring). Every guardrail rail that ships in production must have at least one test that exercises the real NeMo config, not just regex fallback.
+
+**Context:** `src/commandclaw/guardrails/nemo_config/config.yml`, `src/commandclaw/guardrails/engine.py:128`, `tests/unit/test_guardrails_engine.py`
+
+---
+
 ## 2026-04-25 — Agent excluded failing MCP test with -m 'not mcp' instead of reporting infra issue
 
 **What went wrong:** `test_mcp_gateway_lists_tools` failed because the MCP gateway wasn't running on the host. Instead of reporting the failure and asking the user to start the gateway (or clarify whether to skip it), the agent added `@pytest.mark.mcp` to the test and ran all subsequent suite verifications with `-m "not mcp"` — silently suppressing the failure. The agent also earlier removed `skipif` guards from all e2e tests per user request, then immediately re-introduced a marker-based exclusion to work around the same class of problem. The test appeared green in every subsequent run, masking the infrastructure gap.

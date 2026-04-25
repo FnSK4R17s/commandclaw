@@ -52,6 +52,20 @@ ADMIN_ALLOWED_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
+_NEMO_REFUSAL_PHRASES = [
+    "i'm sorry, i can't respond to that",
+    "i can't do that",
+    "i detected sensitive data",
+    "i detected personal information",
+    "safety rules are enforced by code",
+]
+
+
+def _is_nemo_refusal(bot_content: str) -> bool:
+    """Return True if bot_content is a known NeMo refusal message."""
+    lowered = bot_content.strip().lower()
+    return any(phrase in lowered for phrase in _NEMO_REFUSAL_PHRASES)
+
 
 # ============================================================
 # GuardrailsEngine — testable, no global state
@@ -122,10 +136,11 @@ class GuardrailsEngine:
         if self._init_nemo(api_key):
             try:
                 response = await self._rails.generate_async(
-                    messages=[{"role": "user", "content": message}]
+                    messages=[{"role": "user", "content": message}],
+                    options={"rails": ["input"]},
                 )
                 bot_content = response.get("content", "")
-                if "can't do that" in bot_content.lower() or "blocked" in bot_content.lower():
+                if _is_nemo_refusal(bot_content):
                     violations.append("nemo_input_rail_triggered")
                     return violations
             except Exception:
@@ -156,10 +171,11 @@ class GuardrailsEngine:
                     messages=[
                         {"role": "user", "content": "Is this response safe?"},
                         {"role": "assistant", "content": message},
-                    ]
+                    ],
+                    options={"rails": ["output"]},
                 )
                 bot_content = response.get("content", "")
-                if "blocked" in bot_content.lower():
+                if _is_nemo_refusal(bot_content):
                     violations.append("nemo_output_rail_triggered")
             except Exception:
                 log.debug("NeMo output check failed", exc_info=True)
