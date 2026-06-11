@@ -1,108 +1,73 @@
-# commandclaw — the agent runtime
+# commandclaw — the agent runtime (Rust rebuild)
 
-> The process that actually runs. Reads from a vault, talks to LLMs and tools through proxies, streams back to the user.
+> The agentic layer. A greenfield Rust rewrite. It receives a message, runs an agent loop, and — when a task needs deterministic code changes — delegates a *Spec* to CKRV across a thin MCP seam and relays the verified result back.
+
+This document describes the **greenfield Rust rebuild**. The previous Python/LangGraph runtime — LangChain execution loop, Docker-per-agent, Presidio/NeMo guardrails, Langfuse tracing — is **superseded and discarded**; see [ADR-0001](../docs/adr/0001-rebuild-commandclaw-rust.md) for why. Canonical vocabulary lives in [CONTEXT.md](../CONTEXT.md); the active milestone is [plan/M1-delegation-slice.md](../plan/M1-delegation-slice.md).
 
 ## Why it exists
 
-Modern agent frameworks make one of two trade-offs: either the agent's configuration is buried in code (fast to build, impossible to audit) or it lives in a UI/database (easy to click through, impossible to version). Neither works for teams that need to know exactly what an agent will do *before* it runs, and exactly what it did *after*.
+CommandClaw is the **agent**: the conversational, memory-bearing system the user talks to. It decides *what* to do and *whether* to act. Its counterpart, **CKRV** (Chakravarti), is a deterministic `spec → verified-diff` pipeline that decides *how* and proves *done*. CommandClaw never edits code in an open-ended loop itself — when a task requires deterministic code changes, it authors a *Spec* and hands it to CKRV across the **Seam** (CKRV's MCP server), then awaits a verified diff/PR. (Full glossary in [CONTEXT.md](../CONTEXT.md).)
 
-`commandclaw` is the runtime for a git-native agent — one whose system prompt, personality, skills, memory, and behavior rules all live as files in a git repository you clone per agent. Change the agent by committing to its vault. Audit the agent by reading its vault. Fork the agent by cloning its vault.
+The rebuild is **learning-first** (ADR-0001): the goal is to understand agent internals by hand-rolling the loop, not to ship a commodity framework. The agent loop is the prize — built by hand, not delegated to a library.
 
-It is a ground-up redesign of [openclaw](openclaw.md) with enterprise controls baked in from day one: phantom tokens for tool credentials, virtual keys for LLM access, filesystem-isolated Docker execution, full Langfuse tracing, and guardrails via Presidio + NeMo.
+## What exists now (S0–S2)
 
-## What it does
+The project is **mid-M1**. Only the front-half plumbing is built, and the loop itself is still a single turn. Precise current state:
 
-| Capability | Detail |
-|---|---|
-| **Vault-driven configuration** | Every agent has a personal vault (`~/.commandclaw/workspaces/<agent-id>/`) cloned from [commandclaw-vault](commandclaw-vault.md). Files like `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, `USER.md` are read by the runtime on boot. |
-| **Chat loop** | CLI chat or Telegram webhook. LangGraph state machine with retry, tool execution, streaming. |
-| **Tool execution** | Bash, file I/O (scoped to `/workspace`), vault memory, skill registry. MCP tools via the [MCP gateway](commandclaw-mcp.md). |
-| **Isolation** | Each agent runs in its own Docker container: 512MB RAM, 1 CPU, read-only root, tmpfs for scratch, vault bind-mounted at `/workspace`. |
-| **Agent naming** | `adjective-animal-NNNN` (chakravarti-cli convention) — stable, memorable, greppable. |
-| **Memory** | Daily notes and long-term MEMORY.md, auto-committed to the vault on every write. |
-| **Guardrails** | Presidio (PII detection + redaction), NeMo Guardrails config, regex-based command linting, detect-secrets. |
-| **Tracing** | Full Langfuse integration — LLM calls, tool calls, graph state transitions. |
-
-## Tech stack and why
-
-| Choice | Reason |
-|---|---|
-| **Python 3.11+** | LangGraph/LangChain ecosystem is Python-native. `target-version = "py311"` in ruff config. |
-| **LangChain + LangGraph ≥1.1** | LangGraph gives an explicit state machine for the chat loop — retries, tool calls, and branching are graph edges instead of hidden control flow. Checkpoints via `langgraph-checkpoint-sqlite`. |
-| **python-telegram-bot** | Telegram is the default non-terminal surface. Single, well-maintained library for webhooks, updates, and media. |
-| **MCP** | Tools are MCP tools. Means every external integration is pluggable and uses the same wire protocol. The runtime is an MCP *client* talking to [commandclaw-mcp](commandclaw-mcp.md) as the server. |
-| **Langfuse v4 SDK** | First-class tracing of LLM calls, tool calls, and graph state. Self-host via [commandclaw-observe](commandclaw-observe.md) or use cloud. |
-| **Presidio + NeMo Guardrails** | Defense-in-depth. Presidio catches PII with proven detectors; NeMo catches prompt-level policy violations. |
-| **GitPython** | The vault is a git repo. Memory writes auto-commit. No bash shelling out for common ops. |
-| **pydantic + pydantic-settings** | Settings from env (`COMMANDCLAW_*` prefix) with schema validation. Fail fast on boot, not at runtime. |
-| **hatchling** | Minimal PEP 517 build backend. No unnecessary build machinery. |
-| **Docker** | Isolation of untrusted agent bash. Matches the MCP gateway's network so agents reach tools without exposing the host. |
-
-## Internal architecture
-
-```
-src/commandclaw/
-├── __main__.py           CLI entry: `commandclaw chat`, `commandclaw telegram`, etc.
-├── config.py             Pydantic settings (COMMANDCLAW_* env vars)
-├── agent/
-│   ├── graph.py          LangGraph state machine — nodes for prompt, tool, retry
-│   ├── prompt.py         System-prompt assembly from vault files (AGENTS.md, SOUL.md, …)
-│   ├── retry.py          Retry policy for tool failures and transient LLM errors
-│   ├── runtime.py        Agent boot, lifecycle, vault resolution
-│   └── tools/
-│       ├── bash_tool.py      regex-linted shell execution
-│       ├── file_read.py      Read a file in the vault
-│       ├── file_write.py     Write + auto-commit
-│       ├── file_list.py      List files and dirs
-│       ├── file_delete.py    Delete + auto-commit
-│       ├── vault_memory.py   memory_read / memory_write
-│       ├── vault_skill.py    Skill discovery
-│       ├── skill_registry.py Skill lookup + frontmatter parsing
-│       └── system_info.py    Async system info (host, cwd, git state)
-├── vault/                Vault clone management, workspace resolution
-├── mcp/                  MCP client for commandclaw-mcp
-├── telegram/             python-telegram-bot handlers
-├── guardrails/           Presidio, NeMo, detect-secrets wiring
-│   └── nemo_config/      NeMo Guardrails policy files
-└── tracing/              Langfuse wiring
-```
-
-The shape is deliberately flat. Each concern is a package, each package exposes a small public surface, and the state machine in `agent/graph.py` is the only orchestrator.
-
-## External interfaces
-
-| Interface | Direction | Used for |
+| Piece | File | State |
 |---|---|---|
-| **LLM over HTTP** | runtime → [commandclaw-gateway](commandclaw-gateway.md) | All LLM calls. OpenAI-format for ChatOpenAI, Anthropic-format for Anthropic. Virtual key only. |
-| **MCP over HTTP/stdio** | runtime → [commandclaw-mcp](commandclaw-mcp.md) | Tool calls. Phantom token only. |
-| **git** | runtime ↔ vault | Read config + skills, write memory, commit + push. |
-| **Telegram HTTPS** | runtime ↔ Telegram | User messages, replies, media. |
-| **Langfuse SDK** | runtime → [commandclaw-observe](commandclaw-observe.md) or Langfuse Cloud | Traces. |
+| Workspace scaffold (S0) | [Cargo.toml](../Cargo.toml) | `[workspace] members = ["crates/*"]`, edition 2024, resolver 3. Shared deps: `tokio`, `anyhow`. Crates are added per build step. |
+| Binary crate | [crates/commandclaw/Cargo.toml](../crates/commandclaw/Cargo.toml) | Deps: `teloxide` (Telegram), `async-openai` (model), `dotenvy` (env). |
+| Telegram channel (S1) | [crates/commandclaw/src/main.rs](../crates/commandclaw/src/main.rs) | `teloxide::repl` receive/send loop; chat-id allow-list via `COMMANDCLAW_ALLOWED_CHAT_IDS` (empty = open). |
+| Agent-loop seam (S2) | `main.rs` → `respond()` | **Single-turn** model call. This is the function that grows into the real tool-calling loop. |
+| Model layer (S2) | [crates/commandclaw/src/model.rs](../crates/commandclaw/src/model.rs) | `ModelClient` over an OpenAI-compatible endpoint. Env: `OPENAI_API_KEY`, `OPENAI_BASE_URL` (optional), `COMMANDCLAW_MODEL` (default `gpt-4o-mini`). |
 
-## Deployment shape
+Round-trip today: **Telegram message → `respond()` → one `ModelClient::chat` call → reply.** No history, no tools, no delegation yet. Configuration is via `.env` ([.env.example](../.env.example) groups vars by build step).
+
+## Target shape (M1 — the delegation slice)
+
+M1 is the thinnest end-to-end path that crosses the Seam (ADR-0002):
 
 ```
-~/.commandclaw/
-├── workspaces/
-│   ├── brave-panda-4821/       ← vault clone (one per agent)
-│   └── swift-falcon-0137/      ← vault clone (one per agent)
-├── mcp.json                     ← MCP gateway config (not in any repo)
-└── .env                         ← secrets
-
-docker network: commandclaw
-  ├── agent-brave-panda-4821   (this repo's image)
-  ├── agent-swift-falcon-0137  (this repo's image)
-  ├── commandclaw-mcp           (commandclaw-mcp repo)
-  └── commandclaw-gateway       (commandclaw-gateway repo)
+Telegram ──▶ CommandClaw (Rust) ──MCP──▶ CKRV (ckrv-mcp) ──▶ verified diff ──▶ PR
+   ▲                                                                            │
+   └──────────────────────── PR URL ◀───────────────────────────────────────────┘
 ```
 
-The runtime image is intentionally small: it ships Python, the commandclaw package, and nothing else. All state — identity, memory, skills — is a bind mount from the vault. Kill the container and the agent is unchanged; rebuild the image without touching the vault and the agent inherits the upgrade.
+Build order — walking skeleton first, depth second ([plan/M1-delegation-slice.md](../plan/M1-delegation-slice.md)):
+
+| Step | What | Built? |
+|---|---|---|
+| S0 | Rust workspace + CI (`cargo test` / `clippy`) | ✅ |
+| S1 | Telegram echo (channel proven) | ✅ |
+| S2 | One model call (model layer proven) | ✅ |
+| S3 | `ckrv-mcp` reachable; `tools/list` returns CKRV's commands | ⬜ |
+| S4 | Seam with a stub CKRV tool returning a fake PR URL | ⬜ |
+| S5 | CKRV real, standalone: `ckrv run <spec>` → verified diff/PR (one provider, one sandbox) | ⬜ |
+| S6 | Wire it: agent authors the Spec → delegates over MCP → real PR returns to chat = **M1 green** | ⬜ |
+
+The skeleton (S1–S4) is deliberately shallow; the depth (S5–S6) is where CKRV's last 20% gets finished and real codegen lands. Until the round-trip closes once, the loop in `respond()` is the active build surface.
+
+## The Seam (CommandClaw ↔ CKRV)
+
+- CommandClaw is an **MCP client**; CKRV's `ckrv-mcp` is the **server**, exposing a run-spec tool that takes a *Spec* and returns `{verified, diff/PR url}`.
+- **No code is shared across the Seam** (ADR-0001) — the two are independent products with independent release cycles. CKRV stays a pristine standalone CLI.
+- CommandClaw builds its **own** model/provider layer ([model.rs](../crates/commandclaw/src/model.rs)) rather than reusing CKRV's `ckrv-model`.
+- Transport mechanics are worked out in [plan/M1-delegation-slice.md](../plan/M1-delegation-slice.md) ("Seam mechanics") and are not yet wired (S4/S6).
+
+## Deferred until M1 is green (the tripwire)
+
+ADR-0002 forbids breadth before the round-trip closes. **None of the following exists, and none should be documented as if it does:** multi-channel, memory/Vault persistence, heartbeat/cron/autonomy, the Confirmation Gate, the skills system, a TUI, the phantom-token `commandclaw-mcp` proxy, multi-provider routing, and rich tracing/observability. M1 is deliberately **stateless and single-channel**.
+
+One tenet is pre-decided for when memory lands (ADR-0003): agent state will be **version-controlled markdown** (the *Vault*) — edited directly by the human and audited via `git`, not held in chat or a database. It does **not** bind M1, which is stateless.
 
 ## Key files
 
-- [src/commandclaw/agent/graph.py](../src/commandclaw/agent/graph.py) — the state machine
-- [src/commandclaw/agent/prompt.py](../src/commandclaw/agent/prompt.py) — how vault files become a system prompt
-- [scripts/spawn-agent.sh](../scripts/spawn-agent.sh) — spawn / resume / list agents
-- [Dockerfile](../Dockerfile) — agent container
-- [docker-compose.yml](../docker-compose.yml) — full local stack
-- [guiding_docs/VISION.md](../guiding_docs/VISION.md) — the long-form "why"
+- [crates/commandclaw/src/main.rs](../crates/commandclaw/src/main.rs) — Telegram channel + the `respond()` agent-loop seam (grow this).
+- [crates/commandclaw/src/model.rs](../crates/commandclaw/src/model.rs) — `ModelClient`, the OpenAI-wire model layer.
+- [Cargo.toml](../Cargo.toml) — workspace manifest; crates added per build step.
+- [.env.example](../.env.example) — environment variables, grouped by build step.
+- [docs/adr/0001-rebuild-commandclaw-rust.md](../docs/adr/0001-rebuild-commandclaw-rust.md) — why Rust, why a thin seam, why no shared code.
+- [docs/adr/0002-m1-delegation-slice.md](../docs/adr/0002-m1-delegation-slice.md) — M1 and the tripwire.
+- [docs/adr/0003-agent-state-version-controlled-markdown.md](../docs/adr/0003-agent-state-version-controlled-markdown.md) — the Vault tenet (post-M1).
+- [CONTEXT.md](../CONTEXT.md) — glossary. [plan/M1-delegation-slice.md](../plan/M1-delegation-slice.md) — the build plan.

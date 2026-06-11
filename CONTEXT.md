@@ -12,7 +12,9 @@
 
 **Channel** — A surface the agent is reached on (e.g. Telegram). One agent, many channels.
 
-**Memory** — The agent's state persisted across sessions (vault files). Distinct from a *Spec*: memory is who-the-agent-is and what-it-knows; a Spec is a one-off code-change contract handed across the *Seam*.
+**Memory** — The agent's state persisted across sessions, held in the *Vault*. Distinct from a *Spec*: memory is who-the-agent-is and what-it-knows; a Spec is a one-off code-change contract handed across the *Seam*.
+
+**Vault** — The version-controlled markdown files that hold the agent's *Memory* and configuration. The agent's **control plane**: edited directly by the human (not through chat) and audited via `git`. Distinct from a *Channel* (an I/O surface) and a *Spec* (a transient contract across the *Seam*). See `docs/adr/0003`.
 
 **Heartbeat / Cron** — Autonomy triggers that make the agent act with no user message. Heartbeat applies judgment ("anything worth doing?"); Cron fires on a fixed schedule.
 

@@ -5,170 +5,84 @@
 <h1 align="center">Command Claw</h1>
 
 <p align="center">
-  <strong>Git-native agent platform built for enterprise reliability and control.</strong><br>
-  <em>A ground-up redesign of OpenClaw — your vault commands the agents, not the other way around.</em><br>
-  <sub>Configuration, memory, and behavior rules live in files you can inspect, edit, version, and audit.</sub>
+  <strong>The agentic half of a two-part system — a greenfield Rust rebuild.</strong><br>
+  <em>CommandClaw decides what to do and whether to act; CKRV does it deterministically and proves it done.</em><br>
+  <sub>Built to understand how agents work by hand-rolling the loop — not to ship a framework.</sub>
 </p>
 
 ---
 
 > [!WARNING]
-> **Beta Software** — This project is under active development. Workflows and commands may be incomplete or broken. Your feedback helps make this better!
+> **Beta Software** — This project is under active development (mid-M1; see Architecture). Workflows and commands may be incomplete or broken. Your feedback helps make this better!
 >
 > Have feedback or found a bug?  Reach out at [**@_Shikh4r_** on X](https://x.com/_Shikh4r_)
 
 ## Quick Start
 
+Prerequisites: Rust (stable), a Telegram bot token from [@BotFather](https://t.me/BotFather), and an OpenAI-compatible API key.
+
 ```bash
-# 1. Clone the repos
+# 1. Clone and enter
 gh repo clone FnSK4R17s/commandclaw
-gh repo clone FnSK4R17s/commandclaw-vault
+cd commandclaw
 
 # 2. Configure
-cd commandclaw
 cp .env.example .env
-# Edit .env — set COMMANDCLAW_OPENAI_API_KEY
+# Edit .env — set TELOXIDE_TOKEN, OPENAI_API_KEY, COMMANDCLAW_MODEL
 
-# 3. Spawn an agent (creates workspace + Docker container)
-./scripts/spawn-agent.sh
-# → Spawning agent: brave-panda-4821
-
-# 4. Resume an existing agent
-./scripts/spawn-agent.sh brave-panda-4821
-
-# 5. List all agents
-./scripts/spawn-agent.sh --list
+# 3. Run
+cargo run -p commandclaw
 ```
 
-Each agent gets its own isolated workspace cloned from the [commandclaw-vault](https://github.com/FnSK4R17s/commandclaw-vault) template, named with the chakravarti-cli convention: `adjective-animal-NNNN`. The agent ID is the workspace name.
+Message your bot — it replies via the model. That is the current round-trip (Telegram → agent → model → reply). What comes next is in [plan/M1-delegation-slice.md](plan/M1-delegation-slice.md).
 
-```
-~/.commandclaw/workspaces/
-  brave-panda-4821/     ← Agent vault (Git repo)
-  swift-falcon-0137/    ← Another agent
-```
-
-## Containerized Agents
-
-Agents run inside persistent Docker containers with filesystem isolation:
-
-- `/workspace` — the vault, mounted from `~/.commandclaw/workspaces/<agent-id>/`
-- No host filesystem access beyond the vault
-- 512MB memory, 1 CPU limit
-- Read-only root filesystem, tmpfs for `/tmp` and `/home/agent`
-- Connected to the MCP gateway via Docker network
-
-```bash
-# Spawn new agent in container
-./scripts/spawn-agent.sh
-
-# Run locally (dev mode, no container)
-COMMANDCLAW_AGENT_ID=brave-panda-4821 python -m commandclaw chat
-```
-
-## Agent Tools
-
-| Tool | Description |
-|------|-------------|
-| `bash` | Execute shell commands (scoped to `/workspace` in container) |
-| `file_list` | List files and directories in the vault |
-| `file_read` | Read a file from the vault |
-| `file_write` | Create or overwrite a file in the vault |
-| `file_delete` | Delete a file from the vault |
-| `memory_read` | Read long-term memory and daily notes |
-| `memory_write` | Write to daily notes or long-term memory (auto-commits to Git) |
-| `list_skills` | Discover available skills |
-| `read_skill` | Load a skill's full instructions |
-
-All file tools are sandboxed to the vault directory. Path traversal outside the vault is rejected.
-
-## Repositories
-
-| Repo | Purpose |
-|------|---------|
-| [commandclaw](https://github.com/FnSK4R17s/commandclaw) | Agent runtime, Telegram I/O, tracing |
-| [commandclaw-vault](https://github.com/FnSK4R17s/commandclaw-vault) | Vault template — cloned per agent workspace |
-| [commandclaw-mcp](https://github.com/FnSK4R17s/commandclaw-mcp) | MCP gateway — credential proxy with rotating keys |
-| [commandclaw-gateway](https://github.com/FnSK4R17s/commandclaw-gateway) | LLM routing layer — provider credentials, virtual keys, budgets, rate limits, multi-provider fallback |
-| [commandclaw-skills](https://github.com/FnSK4R17s/commandclaw-skills) | Skills library — `npx skills add FnSK4R17s/commandclaw-skills` |
-| [commandclaw-memory](https://github.com/FnSK4R17s/commandclaw-memory) | Recall service — wiki validation, LanceDB + BM25 indexing, distillation, hybrid retrieval |
-| [commandclaw-wiki](https://github.com/FnSK4R17s/commandclaw-wiki) | LLM Wiki — persistent, compounding knowledge base per agent (Karpathy pattern) |
-| [commandclaw-observe](https://github.com/FnSK4R17s/commandclaw-observe) | Self-hosted observability — Langfuse tracing + Prometheus + Grafana, one compose |
+> The rebuild currently lives on the `feat/rust-rebuild` branch. `main` still holds the superseded Python tree until the rebuild merges.
 
 ## Architecture
 
-See [guiding_docs/VISION.md](guiding_docs/VISION.md) for the full vision and [guiding_docs/DEVLOG.md](guiding_docs/DEVLOG.md) for the daily development log.
+CommandClaw is being **rebuilt greenfield in Rust**. The previous Python/LangGraph runtime — LangChain execution loop, Docker-per-agent, Presidio/NeMo guardrails, Langfuse — is superseded and discarded. The decision, the milestone, and the surviving tenets live in the ADRs: [ADR-0001](docs/adr/0001-rebuild-commandclaw-rust.md) (rebuild + thin MCP seam to CKRV), [ADR-0002](docs/adr/0002-m1-delegation-slice.md) (the M1 delegation slice + tripwire), [ADR-0003](docs/adr/0003-agent-state-version-controlled-markdown.md) (the Vault tenet). Glossary: [CONTEXT.md](CONTEXT.md). Active build plan: [plan/M1-delegation-slice.md](plan/M1-delegation-slice.md). Deeper map: [architecture/commandclaw.md](architecture/commandclaw.md). (The old [guiding_docs/VISION.md](guiding_docs/VISION.md) is superseded.)
 
-**Three layers:**
+**Two products, one thin seam.** CommandClaw is the **agentic layer** — it decides *what* to do and *whether* to act. **CKRV** (Chakravarti) is the **deterministic pipeline** — it decides *how* and proves *done*. When a task needs code changes, CommandClaw authors a *Spec* and delegates it to CKRV across an **MCP seam**, then relays CKRV's **verified diff/PR** back to the user. No code is shared across the seam; the two ship as independent products.
 
-1. **Agent Runtime** — LangGraph + OpenAI execution loop. Each agent runs independently in its own container with its own Git vault.
-2. **Skills Layer** — Markdown files describing agent capabilities. Managed by admins, not agents.
-3. **MCP Layer** — Authentication-gated sensitive operations with access control at the protocol level.
+```
+Telegram ──▶ CommandClaw (Rust, agentic) ──MCP──▶ CKRV (deterministic) ──▶ verified diff ──▶ PR
+```
 
-**Core principle:** The vault (Git repo) is the control plane, not chat. Configuration, memory, and behavior rules live in files you can inspect, edit, version, and audit.
+**Status: mid-M1.** M1 is the thinnest round-trip that crosses the seam — a Telegram message becomes a reviewed PR. Built so far (S0–S2): the Rust workspace, the Telegram channel, and a single-turn model call. The tool-calling agent loop, the Spec authoring, and the CKRV MCP delegation (S3–S6) are the work in progress. Per ADR-0002's **tripwire**, everything else is deliberately deferred until the round-trip closes once — multi-channel, memory/vault, autonomy, skills, the confirmation gate, observability. M1 is intentionally stateless and single-channel.
 
-## Workspace-Per-Agent
+**Surviving principle (ADR-0003):** when the memory layer lands (post-M1), agent state will be **version-controlled markdown** — the Vault — inspected and edited as files and audited via `git`, not buried in chat or a database.
 
-Each agent gets an isolated workspace:
+## Related
 
-1. `spawn-agent.sh` generates an agent ID (`adjective-animal-NNNN`)
-2. Clones `commandclaw-vault` template into `~/.commandclaw/workspaces/<agent-id>/`
-3. Initializes a fresh Git repo for the vault
-4. Launches a Docker container with the vault mounted at `/workspace`
+- **`commandclaw`** (this repo) — the agent. Greenfield Rust rebuild.
+- **CKRV (Chakravarti)** — the deterministic `spec → verified-diff` pipeline CommandClaw delegates to across the seam. Developed locally alongside this repo (`ckrv-mcp` is its stdio MCP server).
 
-The agent ID is the workspace name — no separate concept. Resume an agent by its name: `./scripts/spawn-agent.sh brave-panda-4821`
+The earlier sibling repos (`commandclaw-{gateway,mcp,vault,skills,memory,wiki,observe}`) are superseded or deferred per [ADR-0001](docs/adr/0001-rebuild-commandclaw-rust.md) / [ADR-0002](docs/adr/0002-m1-delegation-slice.md) — not part of the M1 build.
 
 ## Configuration
 
-**Two config files**, both at `~/.commandclaw/` (outside Git):
+All configuration is environment variables in `.env` (gitignored; copy from [.env.example](.env.example), which groups them by build step):
 
-| File | Purpose | Who edits |
-|------|---------|-----------|
-| `mcp.json` | Gateway settings, upstream servers, credentials | DevOps/admin |
-| `agents.json` | Per-agent roles, tool grants, rate limits | Agent operators |
-
-**Environment variables** (`.env`):
-
-```bash
-COMMANDCLAW_OPENAI_API_KEY=sk-...          # Required
-COMMANDCLAW_AGENT_ID=brave-panda-4821      # Resume specific agent (optional)
-COMMANDCLAW_OPENAI_MODEL=gpt-5.4-mini      # Default model
-```
+| Variable | Purpose |
+|---|---|
+| `TELOXIDE_TOKEN` | Telegram bot token (from @BotFather). |
+| `COMMANDCLAW_ALLOWED_CHAT_IDS` | Comma-separated chat ids allowed to talk to the bot. Empty = open. |
+| `OPENAI_API_KEY` | Key for any OpenAI-compatible endpoint. |
+| `OPENAI_BASE_URL` | Optional — point at a non-OpenAI provider. |
+| `COMMANDCLAW_MODEL` | Model id (default `gpt-4o-mini`). |
 
 ## MCP
 
-Agents interact with external tools via the [commandclaw-mcp](https://github.com/FnSK4R17s/commandclaw-mcp) gateway:
+MCP is the **seam to CKRV**. CommandClaw is an MCP client; CKRV's `ckrv-mcp` is a stdio MCP server that exposes a run-spec tool. CommandClaw authors a *Spec*, calls the tool, and relays the verified diff/PR back. Transport and spawn mechanics are in [plan/M1-delegation-slice.md](plan/M1-delegation-slice.md) ("Seam mechanics"). Not yet wired — S4/S6.
 
-- **Phantom tokens** — agents get opaque, short-lived tokens. Real API keys never leave the gateway.
-- **HMAC-signed requests** — every request is signed, preventing forgery even with a stolen token.
-- **Dual-layer RBAC** — Cerbos policy engine filters tools at discovery and enforces at call time.
-- **Hourly key rotation** — leaked keys expire within 60 minutes.
-
-```
-Agent → (phantom token + HMAC) → commandclaw-mcp gateway → (real credentials) → External MCP Servers
-```
-
-## Skills
-
-Skills are markdown files in `.agents/skills/` within each agent's vault:
-
-```bash
-npx skills add FnSK4R17s/commandclaw-skills
-```
-
-Skills are managed by administrators, not agents. Agents can read and use skills but cannot install, update, or remove them.
+The phantom-token credential proxy (`commandclaw-mcp`) is a separate, deferred concern — post-M1, per the tripwire.
 
 ## Testing
 
 ```bash
-make test          # full suite
-make test-cov      # with coverage
+cargo test --all                            # tests
+cargo clippy --all-targets -- -D warnings   # lints
+cargo fmt --all -- --check                  # formatting
 ```
 
-See [TEST.md](TEST.md) for setup, configuration, writing new tests, and the TDD workflow.
-
-## Migrating from OpenClaw
-
-```bash
-./scripts/migrate-from-openclaw.sh /path/to/openclaw/workspace /path/to/commandclaw/vault
-```
+CI runs all three on every push ([.github/workflows/rust.yml](.github/workflows/rust.yml)).

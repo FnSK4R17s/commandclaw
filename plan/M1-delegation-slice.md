@@ -58,16 +58,16 @@ Multi-channel; memory/vault persistence; heartbeat/cron/autonomy; the Confirmati
 
 ## Seam mechanics (confirmed 2026-06-11)
 
-`ckrv-mcp` is a **stdio JSON-RPC 2.0 MCP server** (not HTTP) — it reads requests on stdin, writes responses on stdout, and auto-exposes CKRV's CLI command tree as MCP tools (`discover_tools()`). A prebuilt binary exists at `/apps/chakravarti-cli/target/debug/ckrv-mcp` (compiled Mar 21).
+`ckrv-mcp` is a **stdio JSON-RPC 2.0 MCP server** (not HTTP) — it reads requests on stdin, writes responses on stdout, and auto-exposes CKRV's CLI command tree as MCP tools (`discover_tools()`).
 
-So the seam is **subprocess + stdio**, not a network port: CommandClaw's MCP client spawns `ckrv-mcp` and speaks JSON-RPC over its stdio pipes. Because CKRV stays on WSL (Linux ELF) and CommandClaw runs on Windows, CommandClaw spawns it through the WSL bridge:
+So the seam is **subprocess + stdio**, not a network port: CommandClaw's MCP client spawns `ckrv-mcp` and speaks JSON-RPC over its stdio pipes. CKRV is developed natively on Windows (`D:\apps\chakravarti-cli`, cloned from `main` 2026-06-11), so the spawn is direct — no WSL bridge:
 
 ```
-command: wsl
-args:    ["-e", "/apps/chakravarti-cli/target/debug/ckrv-mcp"]
+command: D:\apps\chakravarti-cli\target\debug\ckrv-mcp.exe
+args:    []
 ```
 
-A Rust MCP client (`rmcp`, stdio transport) configures exactly this command. If CKRV is ever built on Windows, drop the `wsl -e` prefix — nothing else in the slice changes.
+A Rust MCP client (`rmcp`, stdio transport) configures exactly this command. (Earlier revisions assumed CKRV-on-WSL spawned via `wsl -e`; that was dropped 2026-06-11 — everything runs on Windows now. Build the binary first: `cargo build -p ckrv-mcp` in the CKRV repo.)
 
 **S5 risk that remains:** ckrv-mcp exposing `ckrv run` as a tool does not prove the underlying `spec → plan → execute → verify → PR` pipeline works end-to-end. That deep path is still the milestone's long pole — S5 is where it gets finished.
 
