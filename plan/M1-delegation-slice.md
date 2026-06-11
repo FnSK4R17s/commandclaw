@@ -37,7 +37,7 @@ De-risk *integration* before *intelligence*. Get the round-trip working with stu
 - **S0 — Scaffold.** New Rust workspace on Windows (recommend a fresh `D:\apps\commandclaw-rs`, archive the Python tree; decision below). `cargo new`, hello-world binary, CI that runs `cargo test` + `cargo clippy`. ✅ when it builds green.
 - **S1 — Telegram echo.** Bot receives a message, echoes it. (Channel proven.) ✅ when you DM it and it echoes.
 - **S2 — One model call.** Message → LLM → reply. (Model layer proven.) ✅ when it answers a question over Telegram.
-- **S3 — CKRV MCP up.** Run `ckrv-mcp` standalone; hit its trivial/list tool with any MCP client (inspector or curl). (CKRV reachable.) ✅ when a tool call returns.
+- **S3 — CKRV MCP up.** Run `ckrv-mcp` standalone; list/call a tool via MCP Inspector (`npx @anthropic-ai/mcp-inspector ckrv-mcp`). (CKRV reachable.) ✅ when `tools/list` returns CKRV's commands.
 - **S4 — Seam with a stub.** CommandClaw's MCP client calls a *stub* CKRV tool that returns a fake PR URL; agent relays it to Telegram. (Round-trip proven end-to-end, no real codegen yet.) ✅ when "do X" → fake PR link in chat.
 - **S5 — CKRV real, standalone.** `ckrv run <hand-written-spec>` produces a real verified diff/PR on a toy repo, one provider, one sandbox — run from the CLI, no CommandClaw. (Backend done; CKRV's last 20% finished.) ✅ when a PR appears on the toy repo.
 - **S6 — Wire it.** Replace the S4 stub with the S5 path: agent authors the Spec from the Telegram message, delegates via MCP, CKRV runs, real PR URL returns to chat. ✅ **= M1 green.**
@@ -56,9 +56,20 @@ Multi-channel; memory/vault persistence; heartbeat/cron/autonomy; the Confirmati
 - **Provider for M1:** dev on whatever's simplest (OpenAI-compatible). The AFK-friendly-provider question (Fireworks/Kimi, GLM) belongs to autonomy, which is post-M1 — do **not** solve it now.
 - **Sandbox:** one only (`ckrv-sandbox`'s Docker path). Toy target repo with trivial CI.
 
-## Seam note (Windows ↔ WSL)
+## Seam mechanics (confirmed 2026-06-11)
 
-CKRV currently lives on WSL; CommandClaw-rust builds on Windows. For M1 this is fine: run `ckrv-mcp` as a localhost server in WSL; the Windows MCP client reaches it over `localhost` (WSL2 forwards). If CKRV later moves to Windows, nothing in the slice changes — the seam is localhost MCP either way.
+`ckrv-mcp` is a **stdio JSON-RPC 2.0 MCP server** (not HTTP) — it reads requests on stdin, writes responses on stdout, and auto-exposes CKRV's CLI command tree as MCP tools (`discover_tools()`). A prebuilt binary exists at `/apps/chakravarti-cli/target/debug/ckrv-mcp` (compiled Mar 21).
+
+So the seam is **subprocess + stdio**, not a network port: CommandClaw's MCP client spawns `ckrv-mcp` and speaks JSON-RPC over its stdio pipes. Because CKRV stays on WSL (Linux ELF) and CommandClaw runs on Windows, CommandClaw spawns it through the WSL bridge:
+
+```
+command: wsl
+args:    ["-e", "/apps/chakravarti-cli/target/debug/ckrv-mcp"]
+```
+
+A Rust MCP client (`rmcp`, stdio transport) configures exactly this command. If CKRV is ever built on Windows, drop the `wsl -e` prefix — nothing else in the slice changes.
+
+**S5 risk that remains:** ckrv-mcp exposing `ckrv run` as a tool does not prove the underlying `spec → plan → execute → verify → PR` pipeline works end-to-end. That deep path is still the milestone's long pole — S5 is where it gets finished.
 
 ## What M1 proves
 
