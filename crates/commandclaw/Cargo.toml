@@ -14,3 +14,4 @@ tokio.workspace = true
 anyhow.workspace = true
 teloxide = "0.17.0"
 dotenvy = "0.15.7"
+async-openai = { version = "0.41.0", features = ["chat-completion"] }
