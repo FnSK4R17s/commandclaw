@@ -46,3 +46,7 @@ docker-compose.override.yml
 .commandclaw/
 .beary/
 .agents/
+
+# Rust
+/target/
+**/*.rs.bk

@@ -1,0 +1,14 @@
+# CommandClaw — Rust rebuild (greenfield). See docs/adr/0001, docs/adr/0002, plan/M1-delegation-slice.md.
+# Workspace; crates are added per M1 build step (S1 telegram, S2 model, S5/S6 mcp seam...).
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+authors = ["Shikhar Shukla"]
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
